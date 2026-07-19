@@ -1,0 +1,48 @@
+{
+  "guildId": "588127286855860289",
+  "prefix": ".",
+  "notifyUserId": "588050048882049035",
+  "jailRoleId": "1509165540944384151",
+  "status": "Toprak Demirsoy ❤️",
+  "vipRoleId": "1509167089913434292",
+  "nickRoleId": "1509996059915718736",
+  "officialVanityCode": "girdap",
+  "roles": {
+    "botsRoleId": "1527153925013373098",
+    "ownerRoleId": "1509707234408398898",
+    "devRoleId": "1509941362600972329",
+    "modRoleId": "1509904444853325914"
+  },
+  "hierarchy": {
+    "bots": 4,
+    "owner": 3,
+    "dev": 2,
+    "mod": 1
+  },
+  "exemptBotId": "1509406199387390022",
+  "logChannels": {
+    "welcome": "1509674703244234833",
+    "quit": "1509674723955703989",
+    "yetki": "1509674765806469152",
+    "general": "1509684269717655683",
+    "guard": "1509674804175966351"
+  },
+  "emojis": {
+    "success": "1486915679335612548",
+    "error": "1512646597144744018"
+  },
+  "guard": {
+    "enabled": true,
+    "windowMs": 15000,
+    "maxActions": 3,
+    "punish": false
+  },
+  "limits": {
+    "purgeMax": 100
+  },
+  "commandsChannelId": "1509153043931861092",
+  "commandsAllowedRoles": ["1527153925013373098", "1524180623852441610"],
+  "whitelistedUserIds": ["1460802795857907885"],
+  "girdapwlcRoles": ["1509707234408398898", "1514446179751035021"],
+  "girdapwlcAllowedRoles": ["1527153925013373098", "1524180623852441610"]
+}
