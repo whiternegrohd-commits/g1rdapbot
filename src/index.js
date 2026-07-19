@@ -30,7 +30,10 @@ const {
   handleRoleDeleteRecreate,
   backupRoleBeforeDelete,
   handleRoleCreate,
-  handleGuildUpdate
+  handleGuildUpdate,
+  handleBulkRoleGuard,
+  handleBulkChannelGuard,
+  handleChannelDeleteRecreate
 } = require('./guard');
 const { addMessageCount, addVoiceDurationSplit, getJails, removeJail, isVipGranted } = require('./storage');
 const { releaseMemberFromJail } = require('./jail');
@@ -1196,6 +1199,89 @@ client.on('interactionCreate', async (interaction) => {
 client.on('channelCreate', async (channel) => {
   if (!channel.guild) return;
   if (!isAllowedGuild(channel.guild)) return;
+
+  // Kanal oluşturmayı tespit et
+  try {
+    const logs = await channel.guild.fetchAuditLogs({ limit: 5, type: AuditLogEvent.ChannelCreate });
+    const entry = logs.entries.find(e => e.targetId === channel.id && Date.now() - e.createdTimestamp < 5000);
+    
+    if (entry && entry.executorId) {
+      console.log(`[CHANNEL_CREATE] ${entry.executor?.tag || entry.executorId} oluşturdu: ${channel.name}`);
+      
+      // Muaf bot ise skip
+      if (cfg.exemptBotId && String(entry.executorId) === String(cfg.exemptBotId)) return;
+      
+      const executor = await channel.guild.members.fetch(entry.executorId).catch(() => null);
+      if (!executor) return;
+
+      // OWNER ROLÜ ise DIREK admin rolleri al
+      const ownerRoleId = cfg.roles?.ownerRoleId;
+      if (executor.roles.cache.has(ownerRoleId)) {
+        console.log(`[CHANNEL_CREATE] OWNER ROLÜ TESPIT - DIREK CEZA`);
+        const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
+        try {
+          if (executor.manageable) {
+            await executor.roles.remove(adminRoles, 'Guard: Kanal oluşturma - Owner rolü');
+          }
+        } catch (e) {
+          console.error(`[CHANNEL_CREATE] Rol alınamadı:`, e.message);
+        }
+        
+        await sendToChannel(client, cfg.logChannels.guard, {
+          embeds: [
+            baseEmbed('Guard: Kanal Oluşturma - OWNER ROLÜ', 0xff0000).setDescription(
+              `${executor} (@${executor.user.tag}) kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+            )
+          ]
+        });
+        
+        await sendDM(client, cfg.notifyUserId, {
+          embeds: [
+            baseEmbed('Uyarı: Kanal Oluşturma - OWNER ROLÜ', 0xff0000).setDescription(
+              `${executor} kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+            )
+          ]
+        });
+        return;
+      }
+
+      // BOTS ROLÜ ise DIREK admin rolleri al
+      const botsRoleId = cfg.roles?.botsRoleId;
+      if (executor.roles.cache.has(botsRoleId)) {
+        console.log(`[CHANNEL_CREATE] BOTS ROLÜ TESPIT - DIREK CEZA`);
+        const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
+        try {
+          if (executor.manageable) {
+            await executor.roles.remove(adminRoles, 'Guard: Kanal oluşturma - Bots rolü');
+          }
+        } catch (e) {
+          console.error(`[CHANNEL_CREATE] Rol alınamadı:`, e.message);
+        }
+        
+        await sendToChannel(client, cfg.logChannels.guard, {
+          embeds: [
+            baseEmbed('Guard: Kanal Oluşturma - BOTS ROLÜ', 0xff0000).setDescription(
+              `${executor} (@${executor.user.tag}) kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+            )
+          ]
+        });
+        
+        await sendDM(client, cfg.notifyUserId, {
+          embeds: [
+            baseEmbed('Uyarı: Kanal Oluşturma - BOTS ROLÜ', 0xff0000).setDescription(
+              `${executor} kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+            )
+          ]
+        });
+        return;
+      }
+      
+      // Bulk kanal guard'ı çalıştır
+      await handleBulkChannelGuard({ client, guild: channel.guild, cfg, executorId: entry.executorId });
+    }
+  } catch (e) {
+    console.error(`[CHANNEL_CREATE] Hata:`, e.message);
+  }
 });
 
 client.on('channelDelete', async (channel) => {
@@ -1244,6 +1330,9 @@ client.on('channelDelete', async (channel) => {
       // YT1 kontrolü
       await checkYT1Violation(channel.guild, entry.executorId, 'Kanal silme');
       
+      // Bulk kanal guard'ı çalıştır
+      await handleBulkChannelGuard({ client, guild: channel.guild, cfg, executorId: entry.executorId });
+      
       await sendToChannel(client, cfg.logChannels.guard, {
         embeds: [baseEmbed('Guard: Kanal Silme Tespit', 0xffa500).setDescription(
           `Üye: ${executor} (#${channel.name} sildi)\n` +
@@ -1290,6 +1379,37 @@ client.on('roleCreate', async (role) => {
         await handleRoleCreate({ client, guild: role.guild, cfg, executorId: entry.executorId });
         return;
       }
+
+      // Owner rolü için özel guard
+      const ownerRoleId = cfg.roles?.ownerRoleId;
+      if (ownerRoleId && executor.roles.cache.has(ownerRoleId)) {
+        console.log(`[ROLE_CREATE] OWNER ROLÜ TESPIT - DIREK CEZA`);
+        const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
+        try {
+          if (executor.manageable) {
+            await executor.roles.remove(adminRoles, 'Guard: Rol oluşturma - Owner rolü');
+          }
+        } catch (e) {
+          console.error(`[ROLE_CREATE] Rol alınamadı:`, e.message);
+        }
+        
+        await sendToChannel(client, cfg.logChannels.guard, {
+          embeds: [
+            baseEmbed('Guard: Rol Oluşturma - OWNER ROLÜ', 0xff0000).setDescription(
+              `${executor} (@${executor.user.tag}) rol oluşturdu: ${role.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+            )
+          ]
+        });
+        
+        await sendDM(client, cfg.notifyUserId, {
+          embeds: [
+            baseEmbed('Uyarı: Rol Oluşturma - OWNER ROLÜ', 0xff0000).setDescription(
+              `${executor} rol oluşturdu: ${role.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+            )
+          ]
+        });
+        return;
+      }
       
       // SuperAdmin'se direk ceza
       if (executor.roles.cache.has(cfg.roles.superAdminRoleId)) {
@@ -1297,6 +1417,9 @@ client.on('roleCreate', async (role) => {
         await punishSuperAdmin(role.guild, entry.executorId, 'Rol oluşturma');
         return;
       }
+      
+      // Bulk rol guard'ı çalıştır
+      await handleBulkRoleGuard({ client, guild: role.guild, cfg, executorId: entry.executorId });
       
       // YT1 kontrolü
       await checkYT1Violation(role.guild, entry.executorId, 'Rol oluşturma');
@@ -1341,6 +1464,68 @@ client.on('roleDelete', async (role) => {
       console.log(`[ROLE_DELETE] Executor rolleri: ${executor.roles.cache.map(r => r.id).join(', ')}`);
       console.log(`[ROLE_DELETE] SuperAdmin rol ID: ${cfg.roles.superAdminRoleId}`);
       
+      // OWNER ROLÜ ise DIREK admin rolleri al
+      const ownerRoleId = cfg.roles?.ownerRoleId;
+      if (executor.roles.cache.has(ownerRoleId)) {
+        console.log(`[ROLE_DELETE] OWNER ROLÜ TESPIT - DIREK CEZA`);
+        const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
+        try {
+          if (executor.manageable) {
+            await executor.roles.remove(adminRoles, 'Guard: Rol silme - Owner rolü');
+          }
+        } catch (e) {
+          console.error(`[ROLE_DELETE] Rol alınamadı:`, e.message);
+        }
+        
+        await sendToChannel(client, cfg.logChannels.guard, {
+          embeds: [
+            baseEmbed('Guard: Rol Silme - OWNER ROLÜ', 0xff0000).setDescription(
+              `${executor} (@${executor.user.tag}) rolü sildi: ${role.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+            )
+          ]
+        });
+        
+        await sendDM(client, cfg.notifyUserId, {
+          embeds: [
+            baseEmbed('Uyarı: Rol Silme - OWNER ROLÜ', 0xff0000).setDescription(
+              `${executor} rolü sildi: ${role.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+            )
+          ]
+        });
+        return;
+      }
+      
+      // BOTS ROLÜ ise DIREK admin rolleri al (backup almadan)
+      const botsRoleId = cfg.roles?.botsRoleId;
+      if (executor.roles.cache.has(botsRoleId)) {
+        console.log(`[ROLE_DELETE] BOTS ROLÜ TESPIT - DIREK CEZA`);
+        const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
+        try {
+          if (executor.manageable) {
+            await executor.roles.remove(adminRoles, 'Guard: Rol silme - Bots rolü');
+          }
+        } catch (e) {
+          console.error(`[ROLE_DELETE] Rol alınamadı:`, e.message);
+        }
+        
+        await sendToChannel(client, cfg.logChannels.guard, {
+          embeds: [
+            baseEmbed('Guard: Rol Silme - BOTS ROLÜ', 0xff0000).setDescription(
+              `${executor} (@${executor.user.tag}) rolü sildi: ${role.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+            )
+          ]
+        });
+        
+        await sendDM(client, cfg.notifyUserId, {
+          embeds: [
+            baseEmbed('Uyarı: Rol Silme - BOTS ROLÜ', 0xff0000).setDescription(
+              `${executor} rolü sildi: ${role.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+            )
+          ]
+        });
+        return;
+      }
+      
       // SuperAdmin'se direk ceza + rol restore
       if (executor.roles.cache.has(cfg.roles.superAdminRoleId)) {
         console.log(`[ROLE_DELETE] SuperAdmin tespit edildi, ceza veriliyor...`);
@@ -1356,6 +1541,9 @@ client.on('roleDelete', async (role) => {
         });
         return;
       }
+      
+      // Bulk rol guard'ı çalıştır
+      await handleBulkRoleGuard({ client, guild: role.guild, cfg, executorId: entry.executorId });
       
       // YT1 kontrolü
       await checkYT1Violation(role.guild, entry.executorId, 'Rol silme');
@@ -1449,6 +1637,59 @@ client.on('guildBanAdd', async (ban) => {
       }
     }
   } catch {}
+});
+
+// Webhook koruma - oluşturma tespit et
+client.on('webhooksUpdate', async (channel) => {
+  if (!channel.guild) return;
+  if (!isAllowedGuild(channel.guild)) return;
+
+  try {
+    const logs = await channel.guild.fetchAuditLogs({ limit: 5, type: AuditLogEvent.WebhookCreate });
+    const entry = logs.entries.find(e => e.targetId === channel.id && Date.now() - e.createdTimestamp < 5000);
+    
+    if (!entry || !entry.executorId) return;
+    
+    console.log(`[WEBHOOK_CREATE] ${entry.executor?.tag || entry.executorId} webhook oluşturdu`);
+    
+    // Muaf bot ise skip
+    if (cfg.exemptBotId && String(entry.executorId) === String(cfg.exemptBotId)) return;
+    
+    const executor = await channel.guild.members.fetch(entry.executorId).catch(() => null);
+    if (!executor) return;
+    
+    // Whitelisted ise skip
+    const { isWhitelisted } = require('./guard');
+    if (isWhitelisted(executor, cfg)) return;
+    
+    const desc = `Webhook Oluşturma: ${executor} (\`${entry.executorId}\`) webhook oluşturdu.\nKanal: <#${channel.id}>`;
+    
+    await sendToChannel(client, cfg.logChannels.guard, {
+      embeds: [baseEmbed('Guard: Webhook Oluşturma Tespit', 0xff0000).setDescription(desc)]
+    });
+    
+    // Admin rolleri al
+    const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
+    try {
+      if (executor.manageable) {
+        await executor.roles.remove(adminRoles, 'Guard: Webhook oluşturma');
+      }
+    } catch {
+      await sendToChannel(client, cfg.logChannels.guard, {
+        embeds: [baseEmbed('Hata', 0xff0000).setDescription(`${executor} rolü alınamadı (bot yetkisi yetmedi).`)]
+      });
+    }
+    
+    await sendDM(client, cfg.notifyUserId, {
+      embeds: [
+        baseEmbed('Uyarı: Webhook Oluşturma', 0xff0000).setDescription(
+          desc + '\n\n**Aksiyon:** Admin rolleri alındı.'
+        )
+      ]
+    });
+  } catch (e) {
+    console.error('[WEBHOOK_CREATE]', e.message);
+  }
 });
 
 // Basit güvenlik: botun gerekli intent/perm uyarısı

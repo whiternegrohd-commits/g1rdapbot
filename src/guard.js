@@ -4,6 +4,8 @@ const { baseEmbed, sendToChannel, sendDM } = require('./logger');
 // executorId -> [{ at, type }]
 const actionHistory = new Map();
 const roleActionHistory = new Map();
+const bulkRoleHistory = new Map();
+const bulkChannelHistory = new Map();
 
 // Context menu tracking: executorId -> { bans, timeouts, nickChanges }
 const contextMenuTracking = new Map();
@@ -11,12 +13,14 @@ const contextMenuTracking = new Map();
 // Silinen rolleri track et: roleId -> { name, color, permissions, position, members }
 const deletedRolesBackup = new Map();
 
-function addHistory(executorId, type, windowMs) {
+function trackBulkAction(executorId, type, windowMs = 5000) {
   const now = Date.now();
-  const list = actionHistory.get(executorId) ?? [];
+  const map = type === 'role' ? bulkRoleHistory : bulkChannelHistory;
+  
+  const list = map.get(executorId) ?? [];
   const cleaned = list.filter((x) => now - x.at <= windowMs);
-  cleaned.push({ at: now, type });
-  actionHistory.set(executorId, cleaned);
+  cleaned.push({ at: now });
+  map.set(executorId, cleaned);
   return cleaned.length;
 }
 
@@ -38,6 +42,10 @@ function isWhitelisted(member, cfg) {
   
   // Whitelisted user IDs
   if (cfg.whitelistedUserIds?.includes(member.id)) return true;
+  
+  // Muaf roller - botun asla karışamayacağı
+  const exemptRoles = cfg.exemptRoleIds || [];
+  if (exemptRoles.some(roleId => member.roles.cache.has(roleId))) return true;
   
   // Hiyerarşi sistemi: Bots (level 4) muaftır
   const botsRoleId = cfg.roles?.botsRoleId;
@@ -690,6 +698,79 @@ async function handleGuildUpdate({ client, guild, cfg, oldGuild, executorId }) {
   });
 }
 
+async function handleBulkRoleGuard({ client, guild, cfg, executorId }) {
+  if (!executorId || !cfg.guard?.enabled) return;
+
+  const member = await guild.members.fetch(executorId).catch(() => null);
+  if (!member) return;
+  if (isWhitelisted(member, cfg)) return;
+
+  const count = trackBulkAction(executorId, 'role', 5000);
+  
+  if (count < 3) return;
+
+  const desc = `Bulk Rol İşlemi: ${member} (\`${executorId}\`) 5 saniyede **${count}** rol işlemi yaptı.`;
+
+  await sendToChannel(client, cfg.logChannels.guard, {
+    embeds: [baseEmbed('Guard: Bulk Rol İşlemi Tespit', 0xff0000).setDescription(desc)]
+  });
+
+  const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
+  try {
+    if (member.manageable) {
+      await member.roles.remove(adminRoles, 'Guard: Bulk rol işlemi');
+    }
+  } catch {
+    await sendToChannel(client, cfg.logChannels.guard, {
+      embeds: [baseEmbed('Hata', 0xff0000).setDescription(`${member} rolü alınamadı.`)]
+    });
+  }
+
+  await sendDM(client, cfg.notifyUserId, {
+    embeds: [baseEmbed('Uyarı: Bulk Rol İşlemi', 0xff0000).setDescription(
+      desc + '\n\n**Aksiyon:** Admin rolleri alındı.'
+    )]
+  });
+
+  bulkRoleHistory.delete(executorId);
+}
+
+async function handleBulkChannelGuard({ client, guild, cfg, executorId }) {
+  if (!executorId || !cfg.guard?.enabled) return;
+
+  const member = await guild.members.fetch(executorId).catch(() => null);
+  if (!member) return;
+  if (isWhitelisted(member, cfg)) return;
+
+  const count = trackBulkAction(executorId, 'channel', 5000);
+  
+  if (count < 3) return;
+
+  const desc = `Bulk Kanal İşlemi: ${member} (\`${executorId}\`) 5 saniyede **${count}** kanal işlemi yaptı.`;
+
+  await sendToChannel(client, cfg.logChannels.guard, {
+    embeds: [baseEmbed('Guard: Bulk Kanal İşlemi Tespit', 0xff0000).setDescription(desc)]
+  });
+
+  const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
+  try {
+    if (member.manageable) {
+      await member.roles.remove(adminRoles, 'Guard: Bulk kanal işlemi');
+    }
+  } catch {
+    await sendToChannel(client, cfg.logChannels.guard, {
+      embeds: [baseEmbed('Hata', 0xff0000).setDescription(`${member} rolü alınamadı.`)]
+    });
+  }
+
+  await sendDM(client, cfg.notifyUserId, {
+    embeds: [baseEmbed('Uyarı: Bulk Kanal İşlemi', 0xff0000).setDescription(
+      desc + '\n\n**Aksiyon:** Admin rolleri alındı.'
+    )]
+  });
+
+  bulkChannelHistory.delete(executorId);
+}
 module.exports = {
   handleGuardEvent,
   notifyChannelChangeDM,
@@ -702,6 +783,11 @@ module.exports = {
   trackContextMenuAction,
   handleRoleCreate,
   handleGuildUpdate,
+  handleBulkRoleGuard,
+  handleBulkChannelGuard,
+  trackBulkAction,
   hasDangerousPermissions,
+  handleChannelDeleteRecreate,
+  isWhitelisted,
   AuditLogEvent
 };
