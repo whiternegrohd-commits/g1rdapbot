@@ -749,6 +749,48 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
 
+  if (cmd === 'ship') {
+    const user1 = parseUserFromMessage(message, args);
+    if (!user1 || !args[1]) {
+      await message.reply('Kullanım: `.ship @kişi1 @kişi2` veya `.ship <id1> <id2>`');
+      return;
+    }
+
+    const user2Str = args[1];
+    const user2Id = user2Str.replace(/[<@!>]/g, '');
+    if (!/^\d{16,20}$/.test(user2Id)) {
+      await message.reply('İkinci kişiyi etiketle veya ID yaz.');
+      return;
+    }
+
+    const member1 = await fetchMember(message.guild, user1);
+    const member2 = await fetchMember(message.guild, { id: user2Id });
+
+    if (!member1 || !member2) {
+      await message.reply('Bir veya her iki üye bulunamadı.');
+      return;
+    }
+
+    // 0-100 arası random percentage
+    const percentage = Math.floor(Math.random() * 101);
+
+    // Kalp bar: 10 tane (ilk percentage/10 kadarı dolu)
+    const fullHearts = Math.round((percentage / 100) * 10);
+    const hearts = '❤️'.repeat(fullHearts) + '💔'.repeat(10 - fullHearts);
+
+    // Emoji seçimi percentage'e göre
+    let emoji = '💞';
+    if (percentage < 20) emoji = '💔';
+    else if (percentage < 40) emoji = '💛';
+    else if (percentage < 60) emoji = '🧡';
+    else if (percentage < 80) emoji = '💜';
+    else emoji = '💞';
+
+    const shipMsg = `${member1} ${emoji} ${member2}\n${hearts} (%${percentage})`;
+    await message.reply(shipMsg);
+    return;
+  }
+
   // Admin gerektiren komutlar
   if (!isAdmin(message.member, cfg) && !isSuperUser(message.member)) {
     await message.reply('Bu komutu kullanmak için yetkin yok.');
