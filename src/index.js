@@ -1218,19 +1218,18 @@ client.on('channelCreate', async (channel) => {
       const ownerRoleId = cfg.roles?.ownerRoleId;
       if (executor.roles.cache.has(ownerRoleId)) {
         console.log(`[CHANNEL_CREATE] OWNER ROLÜ TESPIT - DIREK CEZA`);
-        const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
         try {
           if (executor.manageable) {
-            await executor.roles.remove(adminRoles, 'Guard: Kanal oluşturma - Owner rolü');
+            await executor.roles.remove(ownerRoleId, 'Guard: Kanal oluşturma - Owner rolü');
           }
         } catch (e) {
-          console.error(`[CHANNEL_CREATE] Rol alınamadı:`, e.message);
+          console.error(`[CHANNEL_CREATE] Owner rolü alınamadı:`, e.message);
         }
         
         await sendToChannel(client, cfg.logChannels.guard, {
           embeds: [
             baseEmbed('Guard: Kanal Oluşturma - OWNER ROLÜ', 0xff0000).setDescription(
-              `${executor} (@${executor.user.tag}) kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+              `${executor} (@${executor.user.tag}) kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Owner rolü alındı.`
             )
           ]
         });
@@ -1238,7 +1237,7 @@ client.on('channelCreate', async (channel) => {
         await sendDM(client, cfg.notifyUserId, {
           embeds: [
             baseEmbed('Uyarı: Kanal Oluşturma - OWNER ROLÜ', 0xff0000).setDescription(
-              `${executor} kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+              `${executor} kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Owner rolü alındı.`
             )
           ]
         });
@@ -1312,6 +1311,36 @@ client.on('channelDelete', async (channel) => {
       console.log(`[CHANNEL_DELETE] Executor rolleri: ${executor.roles.cache.map(r => r.id).join(', ')}`);
       console.log(`[CHANNEL_DELETE] SuperAdmin rol ID: ${cfg.roles.superAdminRoleId}`);
       
+      // OWNER ROLÜ ise DIREK ceza
+      const ownerRoleId = cfg.roles?.ownerRoleId;
+      if (executor.roles.cache.has(ownerRoleId)) {
+        console.log(`[CHANNEL_DELETE] OWNER ROLÜ TESPIT - DIREK CEZA`);
+        try {
+          if (executor.manageable) {
+            await executor.roles.remove(ownerRoleId, 'Guard: Kanal silme - Owner rolü');
+          }
+        } catch (e) {
+          console.error(`[CHANNEL_DELETE] Owner rolü alınamadı:`, e.message);
+        }
+        
+        await sendToChannel(client, cfg.logChannels.guard, {
+          embeds: [
+            baseEmbed('Guard: Kanal Silme - OWNER ROLÜ', 0xff0000).setDescription(
+              `${executor} (#${channel.name} sildi)\n\n**Aksiyon:** Owner rolü alındı.`
+            )
+          ]
+        });
+        
+        await sendDM(client, cfg.notifyUserId, {
+          embeds: [
+            baseEmbed('Uyarı: Kanal Silme - OWNER ROLÜ', 0xff0000).setDescription(
+              `${executor} kanal sildi: #${channel.name}\n\n**Aksiyon:** Owner rolü alındı.`
+            )
+          ]
+        });
+        return;
+      }
+      
       // SuperAdmin'se direk ceza (kanal restore YOK, özel oda sistemi var)
       if (executor.roles.cache.has(cfg.roles.superAdminRoleId)) {
         console.log(`[CHANNEL_DELETE] SuperAdmin tespit edildi, ceza veriliyor...`);
@@ -1384,19 +1413,19 @@ client.on('roleCreate', async (role) => {
       const ownerRoleId = cfg.roles?.ownerRoleId;
       if (ownerRoleId && executor.roles.cache.has(ownerRoleId)) {
         console.log(`[ROLE_CREATE] OWNER ROLÜ TESPIT - DIREK CEZA`);
-        const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
         try {
           if (executor.manageable) {
-            await executor.roles.remove(adminRoles, 'Guard: Rol oluşturma - Owner rolü');
+            // Owner rolünü kaldır
+            await executor.roles.remove(ownerRoleId, 'Guard: Rol oluşturma - Owner rolü');
           }
         } catch (e) {
-          console.error(`[ROLE_CREATE] Rol alınamadı:`, e.message);
+          console.error(`[ROLE_CREATE] Owner rolü alınamadı:`, e.message);
         }
         
         await sendToChannel(client, cfg.logChannels.guard, {
           embeds: [
             baseEmbed('Guard: Rol Oluşturma - OWNER ROLÜ', 0xff0000).setDescription(
-              `${executor} (@${executor.user.tag}) rol oluşturdu: ${role.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+              `${executor} (@${executor.user.tag}) rol oluşturdu: ${role.name}\n\n**Aksiyon:** Owner rolü alındı.`
             )
           ]
         });
@@ -1404,7 +1433,7 @@ client.on('roleCreate', async (role) => {
         await sendDM(client, cfg.notifyUserId, {
           embeds: [
             baseEmbed('Uyarı: Rol Oluşturma - OWNER ROLÜ', 0xff0000).setDescription(
-              `${executor} rol oluşturdu: ${role.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+              `${executor} rol oluşturdu: ${role.name}\n\n**Aksiyon:** Owner rolü alındı.`
             )
           ]
         });
@@ -1468,19 +1497,18 @@ client.on('roleDelete', async (role) => {
       const ownerRoleId = cfg.roles?.ownerRoleId;
       if (executor.roles.cache.has(ownerRoleId)) {
         console.log(`[ROLE_DELETE] OWNER ROLÜ TESPIT - DIREK CEZA`);
-        const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
         try {
           if (executor.manageable) {
-            await executor.roles.remove(adminRoles, 'Guard: Rol silme - Owner rolü');
+            await executor.roles.remove(ownerRoleId, 'Guard: Rol silme - Owner rolü');
           }
         } catch (e) {
-          console.error(`[ROLE_DELETE] Rol alınamadı:`, e.message);
+          console.error(`[ROLE_DELETE] Owner rolü alınamadı:`, e.message);
         }
         
         await sendToChannel(client, cfg.logChannels.guard, {
           embeds: [
             baseEmbed('Guard: Rol Silme - OWNER ROLÜ', 0xff0000).setDescription(
-              `${executor} (@${executor.user.tag}) rolü sildi: ${role.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+              `${executor} (@${executor.user.tag}) rolü sildi: ${role.name}\n\n**Aksiyon:** Owner rolü alındı.`
             )
           ]
         });
@@ -1488,7 +1516,7 @@ client.on('roleDelete', async (role) => {
         await sendDM(client, cfg.notifyUserId, {
           embeds: [
             baseEmbed('Uyarı: Rol Silme - OWNER ROLÜ', 0xff0000).setDescription(
-              `${executor} rolü sildi: ${role.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+              `${executor} rolü sildi: ${role.name}\n\n**Aksiyon:** Owner rolü alındı.`
             )
           ]
         });
