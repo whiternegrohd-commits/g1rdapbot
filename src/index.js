@@ -129,9 +129,8 @@ client.on('ready', async () => {
     }
   }
 
-  // Bot'u sabit kanalda tut (voice channel join) - DEVRE DIŞI (UDP hatası)
-  /*
-  const voiceChannelId = '1518988153552113797';
+  // Bot'u sabit kanalda tut (voice channel join)
+  const voiceChannelId = '1520787780207378433';
   if (cfg.guildId) {
     const guild = client.guilds.cache.get(String(cfg.guildId));
     if (guild) {
@@ -143,16 +142,16 @@ client.on('ready', async () => {
             channelId: channel.id,
             guildId: guild.id,
             adapterCreator: guild.voiceAdapterCreator,
-            selfDeaf: true
+            selfDeaf: true,
+            selfMute: true
           });
-          console.log(`✅ Bot ${channel.name} kanalına bağlandı ve susturuldu`);
+          console.log(`✅ Bot ${channel.name} kanalına bağlandı (sessize alındı)`);
         } catch (e) {
           console.error(`❌ Bot ses kanalına bağlanamadı:`, e.message);
         }
       }
     }
   }
-  */
 
   // her 60 sn jail sürelerini kontrol et
   setInterval(() => {
