@@ -411,10 +411,20 @@ async function handleCommand({ client, message, cfg }) {
     await message.member
       .setNickname(newNick, `Nick değişti: ${message.author.tag}`)
       .then(async () => {
-        const reply = await message.reply('Nick güncellendi.');
-        if (cfg.emojis?.success) await reply.react(cfg.emojis.success).catch(() => {});
+        await message.reply({
+          embeds: [
+            baseEmbed('✅ NİCK GÜNCELLENDI', 0x00ff00)
+              .setThumbnail(message.author.displayAvatarURL({ size: 256 }))
+              .setDescription(
+                `👤 **Üye:** ${message.author}\n` +
+                `📝 **Yeni Nick:** ${newNick || '(Sıfırlandı)'}\n` +
+                `⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+              )
+              .setColor(0x00ff00)
+          ]
+        });
       })
-      .catch((e) => message.reply(`Nick değişmedi: ${e.message}`));
+      .catch((e) => message.reply(`❌ Nick değişmedi: ${e.message}`));
     return;
   }
   if (cmd === 'isim' || cmd === 'nick') {
@@ -439,8 +449,22 @@ async function handleCommand({ client, message, cfg }) {
     const newNick = ['reset', 'sıfır', 'sifir', 'sil'].includes(newNickRaw.toLowerCase()) ? null : safeTruncate(newNickRaw, 32);
     await member
       .setNickname(newNick, `Nick değişti: ${message.author.tag}`)
-      .then(() => message.reply('Nick güncellendi.'))
-      .catch((e) => message.reply(`Nick değişmedi: ${e.message}`));
+      .then(() => {
+        message.reply({
+          embeds: [
+            baseEmbed('✅ NİCK GÜNCELLENDI', 0x00ff00)
+              .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+              .setDescription(
+                `👤 **Üye:** ${member}\n` +
+                `📝 **Yeni Nick:** ${newNick || '(Sıfırlandı)'}\n` +
+                `👮 **Yetkili:** ${message.author}`
+              )
+              .setColor(0x00ff00)
+              .setFooter({ text: `${new Date().toLocaleTimeString('tr-TR')}` })
+          ]
+        });
+      })
+      .catch((e) => message.reply(`❌ Nick değişmedi: ${e.message}`));
     return;
   }
   if (cmd === 'url') {
@@ -733,19 +757,50 @@ async function handleCommand({ client, message, cfg }) {
       }
     });
 
+    // Aktif konuşan
+    const activeCount = voiceActive - afkCount;
+
     // Kanallar bazında detay
     const channelDetails = [];
     for (const [, channel] of voiceChannels) {
       const members = channel.members.size;
       if (members > 0) {
-        channelDetails.push(`• <#${channel.id}> : ${members} kişi`);
+        channelDetails.push(`🎧 <#${channel.id}> — **${members}** kişi`);
       }
     }
 
-    const sayDetails = `🏢 Sunucu: ${guild.name}\n📅 Tarih: ${new Date().toLocaleDateString('tr-TR')}\n\n⭐ Toplam Üye: ${totalMembers}\n🎧 Ses Aktif: ${voiceActive}\n🔇 AFK (Mute/Deaf): ${afkCount}\n✅ Aktif Konuşan: ${voiceActive - afkCount}${channelDetails.length > 0 ? '\n\n📢 Kanal Dağılımı:\n' + channelDetails.slice(0, 10).join('\n') : ''}`;
-    
-    const sayMsg = formatMessage('🎙️', 'Sunucu Ses Durumu', sayDetails);
-    await message.reply(sayMsg);
+    // Embed oluştur
+    const embed = baseEmbed('🎤 SUNUCU SES DURUMU', 0x5865f2)
+      .setDescription(
+        `**Sunucu:** ${guild.name}\n` +
+        `**Tarih:** ${new Date().toLocaleDateString('tr-TR')} • ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`
+      )
+      .addFields(
+        {
+          name: '👥 ÜYELER',
+          value: `\`\`\`\n⭐ Toplam: ${totalMembers}\n🎧 Ses Aktif: ${voiceActive}\n💬 Konuşan: ${activeCount}\n\`\`\``,
+          inline: true
+        },
+        {
+          name: '🔇 DURUMLAR',
+          value: `\`\`\`\n🔇 Muted: ${voiceMembers.size > 0 ? [...voiceMembers.values()].filter(m => m.voice?.selfMute).length : 0}\n🤐 Deafened: ${voiceMembers.size > 0 ? [...voiceMembers.values()].filter(m => m.voice?.selfDeaf).length : 0}\n📴 Streaming: ${voiceMembers.size > 0 ? [...voiceMembers.values()].filter(m => m.voice?.streaming).length : 0}\n\`\`\``,
+          inline: true
+        }
+      )
+      .setColor(0x5865f2)
+      .setThumbnail(guild.iconURL({ size: 256 }))
+      .setFooter({ text: `✨ Anlık Görünüm • ${new Date().toLocaleTimeString('tr-TR')}`, iconURL: message.author.displayAvatarURL({ size: 64 }) });
+
+    // Kanal detayları ekle
+    if (channelDetails.length > 0) {
+      embed.addFields({
+        name: '📢 KANAL DAĞILIMI',
+        value: channelDetails.slice(0, 10).join('\n') || 'Boş',
+        inline: false
+      });
+    }
+
+    await message.reply({ embeds: [embed] });
     return;
   }
 
@@ -812,10 +867,30 @@ async function handleCommand({ client, message, cfg }) {
       await message.reply('Foto rolü bulunamadı (rol ID yanlış olabilir).');
       return;
     }
+    
+    const alreadyHas = member.roles.cache.has(roleId);
+    if (alreadyHas) {
+      await message.reply({ embeds: [baseEmbed('⚠️ BİLGİ', 0xffa500).setDescription(`${member} zaten bu rolü taşıyor.`)] });
+      return;
+    }
+    
     await member.roles.add(roleId, `Foto rolü verildi: ${message.author.tag}`).catch((e) => {
-      message.reply(`Rol verilemedi: ${e.message}`);
+      message.reply(`❌ Rol verilemedi: ${e.message}`);
     });
-    await message.reply(`${member} foto rolü verildi.`);
+    
+    await message.reply({
+      embeds: [
+        baseEmbed('✅ FOTO ROLÜ VERİLDİ', 0x00ff00)
+          .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+          .setDescription(
+            `👤 **Üye:** ${member}\n` +
+            `🎭 **Rol:** <@&${roleId}>\n` +
+            `👮 **Yetkili:** ${message.author}`
+          )
+          .setColor(0x00ff00)
+          .setFooter({ text: `${new Date().toLocaleTimeString('tr-TR')}` })
+      ]
+    });
     return;
   }
 
@@ -834,10 +909,30 @@ async function handleCommand({ client, message, cfg }) {
       await message.reply('Emektar rolü bulunamadı (rol ID yanlış olabilir).');
       return;
     }
+    
+    const alreadyHas = member.roles.cache.has(roleId);
+    if (alreadyHas) {
+      await message.reply({ embeds: [baseEmbed('⚠️ BİLGİ', 0xffa500).setDescription(`${member} zaten bu rolü taşıyor.`)] });
+      return;
+    }
+    
     await member.roles.add(roleId, `Emektar rolü verildi: ${message.author.tag}`).catch((e) => {
-      message.reply(`Rol verilemedi: ${e.message}`);
+      message.reply(`❌ Rol verilemedi: ${e.message}`);
     });
-    await message.reply(`${member} emektar rolü verildi.`);
+    
+    await message.reply({
+      embeds: [
+        baseEmbed('✅ EMEKTAR ROLÜ VERİLDİ', 0x00ff00)
+          .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+          .setDescription(
+            `👤 **Üye:** ${member}\n` +
+            `🏆 **Rol:** <@&${roleId}>\n` +
+            `👮 **Yetkili:** ${message.author}`
+          )
+          .setColor(0x00ff00)
+          .setFooter({ text: `${new Date().toLocaleTimeString('tr-TR')}` })
+      ]
+    });
     return;
   }
 
@@ -856,10 +951,30 @@ async function handleCommand({ client, message, cfg }) {
       await message.reply('YT1 rolü bulunamadı (rol ID yanlış olabilir).');
       return;
     }
+    
+    const alreadyHas = member.roles.cache.has(roleId);
+    if (alreadyHas) {
+      await message.reply({ embeds: [baseEmbed('⚠️ BİLGİ', 0xffa500).setDescription(`${member} zaten bu rolü taşıyor.`)] });
+      return;
+    }
+    
     await member.roles.add(roleId, `YT1 rolü verildi: ${message.author.tag}`).catch((e) => {
-      message.reply(`Rol verilemedi: ${e.message}`);
+      message.reply(`❌ Rol verilemedi: ${e.message}`);
     });
-    await message.reply(`${member} yt1 rolü verildi.`);
+    
+    await message.reply({
+      embeds: [
+        baseEmbed('✅ YT1 ROLÜ VERİLDİ', 0x5865f2)
+          .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+          .setDescription(
+            `👤 **Üye:** ${member}\n` +
+            `🎬 **Rol:** <@&${roleId}>\n` +
+            `👮 **Yetkili:** ${message.author}`
+          )
+          .setColor(0x5865f2)
+          .setFooter({ text: `${new Date().toLocaleTimeString('tr-TR')}` })
+      ]
+    });
     return;
   }
 
@@ -878,10 +993,30 @@ async function handleCommand({ client, message, cfg }) {
       await message.reply('YT2 rolü bulunamadı (rol ID yanlış olabilir).');
       return;
     }
+    
+    const alreadyHas = member.roles.cache.has(roleId);
+    if (alreadyHas) {
+      await message.reply({ embeds: [baseEmbed('⚠️ BİLGİ', 0xffa500).setDescription(`${member} zaten bu rolü taşıyor.`)] });
+      return;
+    }
+    
     await member.roles.add(roleId, `YT2 rolü verildi: ${message.author.tag}`).catch((e) => {
-      message.reply(`Rol verilemedi: ${e.message}`);
+      message.reply(`❌ Rol verilemedi: ${e.message}`);
     });
-    await message.reply(`${member} yt2 rolü verildi.`);
+    
+    await message.reply({
+      embeds: [
+        baseEmbed('✅ YT2 ROLÜ VERİLDİ', 0x57f287)
+          .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+          .setDescription(
+            `👤 **Üye:** ${member}\n` +
+            `🎥 **Rol:** <@&${roleId}>\n` +
+            `👮 **Yetkili:** ${message.author}`
+          )
+          .setColor(0x57f287)
+          .setFooter({ text: `${new Date().toLocaleTimeString('tr-TR')}` })
+      ]
+    });
     return;
   }
 
@@ -1010,12 +1145,31 @@ async function handleCommand({ client, message, cfg }) {
       return;
     }
 
+    const alreadyHas = member.roles.cache.has(roleId);
+    if (alreadyHas) {
+      await message.reply({ embeds: [baseEmbed('⚠️ BİLGİ', 0xffa500).setDescription(`${member} zaten VIP.`)] });
+      return;
+    }
+
     try {
       await member.roles.add(roleId, `VIP verildi: ${message.author.tag}`);
       setVipGrant(message.guild.id, member.id, message.author.id);
-      await message.reply(`${member} VIP rolü verildi.`);
+      
+      await message.reply({
+        embeds: [
+          baseEmbed('✅ VIP ROLÜ VERİLDİ', 0xffd700)
+            .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+            .setDescription(
+              `👤 **Üye:** ${member}\n` +
+              `👑 **Rol:** <@&${roleId}>\n` +
+              `👮 **Yetkili:** ${message.author}`
+            )
+            .setColor(0xffd700)
+            .setFooter({ text: `${new Date().toLocaleTimeString('tr-TR')}` })
+        ]
+      });
     } catch (e) {
-      await message.reply(`VIP verilemedi: ${e.message}`);
+      await message.reply(`❌ VIP verilemedi: ${e.message}`);
     }
     return;
   }
@@ -1035,13 +1189,29 @@ async function handleCommand({ client, message, cfg }) {
       return;
     }
 
-    removeVipGrant(message.guild.id, member.id);
-    if (member.roles.cache.has(roleId)) {
-      await member.roles.remove(roleId, `VIP alındı: ${message.author.tag}`).catch((e) => {
-        message.reply(`VIP rolü alınamadı: ${e.message}`);
-      });
+    const hasRole = member.roles.cache.has(roleId);
+    if (!hasRole) {
+      await message.reply({ embeds: [baseEmbed('⚠️ BİLGİ', 0xffa500).setDescription(`${member} VIP değil.`)] });
+      return;
     }
-    await message.reply(`${member} VIP kaldırıldı.`);
+
+    removeVipGrant(message.guild.id, member.id);
+    await member.roles.remove(roleId, `VIP alındı: ${message.author.tag}`).catch((e) => {
+      message.reply(`❌ VIP rolü alınamadı: ${e.message}`);
+    });
+    
+    await message.reply({
+      embeds: [
+        baseEmbed('✅ VIP ROLÜ ALINDI', 0xff0000)
+          .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+          .setDescription(
+            `👤 **Üye:** ${member}\n` +
+            `👮 **Yetkili:** ${message.author}`
+          )
+          .setColor(0xff0000)
+          .setFooter({ text: `${new Date().toLocaleTimeString('tr-TR')}` })
+      ]
+    });
     return;
   }
 
@@ -1584,10 +1754,29 @@ async function handleCommand({ client, message, cfg }) {
       return message.reply('Whitelist rolleri ayarlı değil.');
     }
 
+    const alreadyHasAll = wlcRoles.every(roleId => member.roles.cache.has(roleId));
+    if (alreadyHasAll) {
+      await message.reply({ embeds: [baseEmbed('⚠️ BİLGİ', 0xffa500).setDescription(`${member} zaten tüm whitelist rollerine sahip.`)] });
+      return;
+    }
+
     try {
       await member.roles.add(wlcRoles, `Girdap WLC tarafından yapıldı`);
       const roleList = wlcRoles.map(id => `<@&${id}>`).join(', ');
-      await message.reply(`✅ ${member} kullanıcısına whitelist rolleri verildi: ${roleList}`);
+      
+      await message.reply({
+        embeds: [
+          baseEmbed('✅ WHİTELİST ROLLERI VERİLDİ', 0x00ff00)
+            .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+            .setDescription(
+              `👤 **Üye:** ${member}\n` +
+              `📋 **Roller:**\n${wlcRoles.map(id => `• <@&${id}>`).join('\n')}\n` +
+              `👮 **Yetkili:** ${message.author}`
+            )
+            .setColor(0x00ff00)
+            .setFooter({ text: `${new Date().toLocaleTimeString('tr-TR')}` })
+        ]
+      });
       
       // Log
       const logMsg = formatMessage('✅', 'Whitelist Rolleri Verildi', `Üye: ${member}\nYetkili: ${message.author}\nRoller: ${roleList}`);
