@@ -1141,6 +1141,15 @@ async function handleCommand({ client, message, cfg }) {
   }
 
   if (cmd === 'rollog') {
+    // Sadece Owner, Bots, SuperAdmin rolleri kullanabilir
+    const allowedRoles = ['1509707234408398898', '1527153925013373098', '1524180623852441610'];
+    const hasPermission = allowedRoles.some(roleId => message.member.roles.cache.has(roleId));
+    
+    if (!hasPermission) {
+      await message.reply('❌ Bu komutu sadece Owner, Bots, SuperAdmin rolleri kullanabilir.');
+      return;
+    }
+
     const user = parseUserFromMessage(message, args);
     if (!user) {
       await message.reply('Kullanım: `.rollog @uye` veya `.rollog <id>`');
@@ -1151,20 +1160,17 @@ async function handleCommand({ client, message, cfg }) {
     if (!member) return message.reply('Üye bulunamadı.');
 
     try {
-      // Son 50 role update log'u al
-      const logs = await message.guild.fetchAuditLogs({ limit: 50, type: AuditLogEvent.MemberRoleUpdate }).catch(() => null);
+      // Son 100 audit log entry'sini al
+      const logs = await message.guild.fetchAuditLogs({ limit: 100, type: AuditLogEvent.MemberRoleUpdate }).catch(() => null);
       
       if (!logs) {
         return message.reply('Audit log erişilemedi.');
       }
 
-      // Bu üyeye ait rol güncellemelerini filtrele
-      const memberLogs = logs.entries.filter(e => e.targetId === member.id);
-
-      // Role change'leri topla (max 5)
+      // Bu üyeye ait TÜM rol değişikliklerini topla
       const roleChanges = [];
-      for (const entry of memberLogs.slice(0, 20)) {
-        if (roleChanges.length >= 5) break;
+      for (const [, entry] of logs.entries) {
+        if (String(entry.targetId) !== String(member.id)) continue;
         
         const changes = entry.changes || [];
         for (const change of changes) {
@@ -1175,38 +1181,89 @@ async function handleCommand({ client, message, cfg }) {
                 roleId: roleObj.id,
                 roleName: roleObj.name,
                 executor: entry.executor,
+                executorId: entry.executorId,
                 createdAt: entry.createdTimestamp,
-                action: change.key === '$add' ? 'add' : 'remove'
+                action: change.key === '$add' ? '✅ ALINDI' : '❌ ALINDI'
               });
-              if (roleChanges.length >= 5) break;
             }
           }
-          if (roleChanges.length >= 5) break;
         }
       }
 
-      // Şu anki rolleri kontrol et
-      const roleLines = roleChanges.map((change, index) => {
-        const hasRole = member.roles.cache.has(change.roleId);
-        const emoji = hasRole ? '✅' : '❌';
-        const timeAgo = getTimeAgo(Date.now() - change.createdAt);
-        const executorName = change.executor?.username || 'Bilinmeyen';
+      if (roleChanges.length === 0) {
+        return message.reply(`${member.user.tag} için rol geçmişi bulunamadı.`);
+      }
+
+      // Zamana göre sırala (en yeni önce)
+      roleChanges.sort((a, b) => b.createdAt - a.createdAt);
+
+      // Sayfala (10 rol per page)
+      const perPage = 10;
+      const pages = Math.ceil(roleChanges.length / perPage);
+      
+      let currentPage = 1;
+      const getPage = (page) => {
+        const start = (page - 1) * perPage;
+        const end = start + perPage;
+        const pageData = roleChanges.slice(start, end);
         
-        return `${emoji} Rol: <@&${change.roleId}> Yetkili: <@${change.executor?.id || '0'}>\n   Tarih: ${timeAgo}`;
-      }).join('\n\n');
+        const lines = pageData.map((change) => {
+          const timeAgo = getTimeAgo(Date.now() - change.createdAt);
+          const executorName = change.executor?.username || 'Bilinmeyen';
+          const executorTag = change.executor ? `<@${change.executor.id}>` : `\`${change.executorId}\``;
+          
+          return `${change.action} <@&${change.roleId}>\n⏱️ ${timeAgo} • 👤 ${executorTag} (${executorName})`;
+        }).join('\n\n');
 
-      const totalRoles = member.roles.cache.size;
-      const description = `👤 **${member.user.tag}** kişisinin rol bilgisi (${totalRoles} rol)\n\n${roleLines || 'Rol geçmişi bulunamadı.'}`;
+        const totalRoles = member.roles.cache.size;
+        
+        return {
+          embeds: [
+            baseEmbed(`📋 ROL GEÇMİŞİ - ${member.user.tag}`, 0x5865f2)
+              .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+              .setDescription(
+                `👤 **Üye:** ${member}\n` +
+                `🔢 **Mevcut Rol Sayısı:** ${totalRoles}\n` +
+                `📊 **Toplam Değişiklik:** ${roleChanges.length}\n\n` +
+                `${lines}`
+              )
+              .setColor(0x5865f2)
+              .setFooter({ text: `Sayfa ${page}/${pages} • Sorgulandı: ${new Date().toLocaleString('tr-TR')}` })
+          ]
+        };
+      };
 
-      await message.reply({
-        embeds: [
-          baseEmbed('📋 ROL LOG', 0x5865f2)
-            .setDescription(description)
-            .setThumbnail(member.displayAvatarURL({ size: 256 }))
-            .setColor(0x5865f2)
-            .setFooter({ text: `Sorgulandı: ${new Date().toLocaleString('tr-TR')}` })
-        ]
-      });
+      const initialMsg = await message.reply(getPage(1));
+      
+      // Basit pagination (emoji reactions)
+      if (pages > 1) {
+        await initialMsg.react('⬅️').catch(() => {});
+        await initialMsg.react('➡️').catch(() => {});
+
+        const filter = (reaction, user) => 
+          (reaction.emoji.name === '⬅️' || reaction.emoji.name === '➡️') && 
+          user.id === message.author.id;
+
+        const collector = initialMsg.createReactionCollector({ filter, time: 5 * 60 * 1000 });
+
+        collector.on('collect', async (reaction) => {
+          if (reaction.emoji.name === '⬅️' && currentPage > 1) {
+            currentPage--;
+          } else if (reaction.emoji.name === '➡️' && currentPage < pages) {
+            currentPage++;
+          } else {
+            return;
+          }
+
+          await initialMsg.edit(getPage(currentPage)).catch(() => {});
+          await reaction.users.remove(message.author.id).catch(() => {});
+        });
+
+        collector.on('end', () => {
+          initialMsg.reactions.removeAll().catch(() => {});
+        });
+      }
+
     } catch (e) {
       console.error('[ROLLOG] Hata:', e.message);
       await message.reply(`❌ Rol log getirilirken hata: ${e.message}`);
