@@ -2050,11 +2050,12 @@ async function handleCommand({ client, message, cfg }) {
   }
 
   if (cmd === 'uykumoduac') {
-    const fullAdminRoleId = '1510665683275616427';
     const ownerId = '588050048882049035';
+    const superAdminRoleId = '1524180623852441610';
     
-    if (message.author.id !== ownerId && !message.member.roles.cache.has(fullAdminRoleId)) {
-      await message.reply('Bu komutu sadece Full Admin rolü veya sunucu sahibi kullanabilir.');
+    // Sadece sunucu sahibi veya SuperAdmin rolü
+    if (message.author.id !== ownerId && !message.member.roles.cache.has(superAdminRoleId)) {
+      await message.reply('❌ Bu komutu sadece sunucu sahibi veya SuperAdmin rolü kullanabilir.');
       return;
     }
 
@@ -2098,11 +2099,12 @@ async function handleCommand({ client, message, cfg }) {
   }
 
   if (cmd === 'uykumodukapat') {
-    const fullAdminRoleId = '1510665683275616427';
     const ownerId = '588050048882049035';
+    const superAdminRoleId = '1524180623852441610';
     
-    if (message.author.id !== ownerId && !message.member.roles.cache.has(fullAdminRoleId)) {
-      await message.reply('Bu komutu sadece Full Admin rolü veya sunucu sahibi kullanabilir.');
+    // Sadece sunucu sahibi veya SuperAdmin rolü
+    if (message.author.id !== ownerId && !message.member.roles.cache.has(superAdminRoleId)) {
+      await message.reply('❌ Bu komutu sadece sunucu sahibi veya SuperAdmin rolü kullanabilir.');
       return;
     }
 
