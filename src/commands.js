@@ -2015,12 +2015,15 @@ async function handleCommand({ client, message, cfg }) {
   }
 
   if (cmd === 'purge' || cmd === 'temizle') {
-    // Owner rolüne her yerde izin, diğerleri sadece commands channel'da
+    // Sunucu sahibi muaf, Owner rolüne her yerde izin, diğerleri sadece commands channel'da
+    const ownerId = '588050048882049035';
     const ownerRoleId = '1509707234408398898';
+    
+    const isSuperUser = message.author.id === ownerId;
     const hasOwnerRole = message.member.roles.cache.has(ownerRoleId);
     
-    if (!hasOwnerRole) {
-      // Owner rolü yoksa command channel kontrolü
+    if (!isSuperUser && !hasOwnerRole) {
+      // Sunucu sahibi değil ve Owner rolü yoksa command channel kontrolü
       if (cfg.commandsChannelId && message.channelId !== cfg.commandsChannelId) {
         await message.reply(`❌ Bu komutu sadece <#${cfg.commandsChannelId}> kanalında kullanabilirsin.`);
         return;
