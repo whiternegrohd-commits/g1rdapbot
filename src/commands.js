@@ -101,11 +101,13 @@ const dissLines = [
 function getHierarchyLevel(member, cfg) {
   if (!member) return 0;
   
+  const superAdminRoleId = cfg.roles.superAdminRoleId;
   const botsRoleId = cfg.roles.botsRoleId;
   const ownerRoleId = cfg.roles.ownerRoleId;
   const devRoleId = cfg.roles.devRoleId;
   const modRoleId = cfg.roles.modRoleId;
   
+  if (superAdminRoleId && member.roles.cache.has(superAdminRoleId)) return 5;
   if (member.roles.cache.has(botsRoleId)) return 4;
   if (member.roles.cache.has(ownerRoleId)) return 3;
   if (member.roles.cache.has(devRoleId)) return 2;

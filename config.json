@@ -8,12 +8,14 @@
   "nickRoleId": "1509996059915718736",
   "officialVanityCode": "girdap",
   "roles": {
+    "superAdminRoleId": "1524180623852441610",
     "botsRoleId": "1527153925013373098",
     "ownerRoleId": "1509707234408398898",
     "devRoleId": "1509941362600972329",
     "modRoleId": "1509904444853325914"
   },
   "hierarchy": {
+    "superAdmin": 5,
     "bots": 4,
     "owner": 3,
     "dev": 2,
