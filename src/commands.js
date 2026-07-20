@@ -20,73 +20,82 @@ const {
 const { releaseMemberFromJail } = require('./jail');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 
-// DISS CÜMLELERİ
+// DISS CÜMLELERİ - IQ'lu ve Kapsamlı
 const dissLines = [
-  // Ses/Mic Disseri
-  "Sesini duyunca Apple Ear Pods bozuluyor",
-  "Mic'ı açma, çevre kirliliği yasası ihlal ederiz",
-  "Ses kalitesi dial-up internet devri'nden daha eski",
-  "Konuş konuş, herkes ses kısıyor",
-  "Esneme sesinden daha kötü bağlantı hiç duymedim",
-  "Voicen bir YouTube Poop hakkı tanımalı",
-  "Ses tonun Skype notification'u gibi sinir bozucu",
-  "Mic'ın spam mi ediyor yoksa sen mi konuşuyorsun?",
+  // Zeka/Mantık Disseri
+  "Beynin bi depo gibi boş, raf raf düşün yok",
+  "Söylediğin şeyler logic'in yok, kod yazıyor gibi hata dolusu",
+  "IQ testin mi yok yoksa kasten mi aptal oynuyorsun?",
+  "Düşün dedim, hemen 404 error verdin miydi beyin?",
+  "Konuşma her açtığın ağız bir bug açıyor sistemde",
+  "Akıl sırasında neredesin? Kaçıncı sırada gittin?",
+  "Bilgi saklıyor musun yoksa hiç yok mu?",
   
-  // Oyun/Rank Disseri
-  "Rank'ı düşüyor diye ego yaşıyor mu?",
-  "Oyun oynarken telefon bakmak suç değil, sen suçsun",
-  "K/D oranı merhaba demek kadar olumsuz",
-  "Bot'a karşı kazanamazsan, insana karşı ne yapcaksın",
-  "Skill'in grafik kart kadar eski jenerasyon",
-  "Frags'in ping'inden daha az",
-  "Gameplay'in tutorial de bile başarısız",
+  // Teknik/Ses Disseri
+  "Sesinde okunuyor: bitrate düşük, kode yüksek",
+  "Konuştukça sanki kompresyon algoritması çöküyor",
+  "Mic'ın AI'a feedback veriyor: 'daha kötüsü yok' diye",
+  "Voice'un kalitesi dial-up modem sesine benziyor",
+  "Ses frekansın ultrasonic, insanlar duymayacak diye Tanrı yaptı",
+  "Decibel ölçeğinde sende negatif değer var",
   
-  // Dış Görünüş Disseri
-  "Profil foto'nu gör, espri yapıyor mu zannettin?",
-  "Avatar'ı değiştir, talisman gibi çalışmıyor",
-  "Yüz'ün bir emoji olmalı, her zaman aynı expresyon",
-  "Discord'da 12 saat yasan bile böyle görünmezsin",
-  "Kameraya yakın gelme, piksel bozulur",
-  "Banner'ın siyah mi yoksa ruh halini gösteriyor mu?",
+  // Oyun/Skill Disseri
+  "Gameplay'in tutorial mod'da bile fail yiyor",
+  "Rank'ı account yaşından düşük, daha yeni başladı mı?",
+  "Bot'a karşı oynuyorsun ama kaybediyorsun, ne yapıyorsun?",
+  "Skill tree'de her punto zeka'ya koymamışsın boşu boşuna",
+  "Frags'in negatif sayıda, kendine atıyor musun?",
+  "K/D rationu Fibonacci serisinden daha karışık",
   
-  // Zeka/IQ Disseri
-  "Beynin 8GB RAM'den az kapasiteli",
-  "Gramer'in Google Translate'ten daha kötü",
-  "Düşüncelerine 'loading...' simgesi koymasak kim bilir",
-  "IQ testinde 40 almış mısın?",
-  "Akıl sırasında neredesin? Kaçıncı sırada?",
-  "Söylediğin her şey bir soru işareti ile bitmeli",
-  "Bilgi toplama hızın merkezi işlemci olmayan cihazdan daha yavaş",
+  // Sosyal Disseri
+  "Sosyal becerin offline mode'da çalışmıyor",
+  "Arkadaş listesi maintenance modunda permanent",
+  "Gruptan kicklenmedin mi? Sorun belki sende midir?",
+  "Network'te sen bir corrupted file gibi duruyor",
+  "Connection'un herkes tarafından blocked",
   
-  // İnternet/Teknoloji Disseri
-  "İnterneti çöp gibi, hatta çöp daha hızlı",
-  "Yazı atması 2G döneminin gücüne sahip",
-  "Ping'in delay atan bir adamdan düşük",
-  "Wi-Fi şifreni unutta mısın, her bağlanışın ilk gibi",
-  "Download hızın bir Nokia ringtone'u kadar yavaş",
-  "Router'ı sana karşı açıda koysam daha hızlı olur",
+  // Görünüş Disseri
+  "Avatar'ın filter uygulanmış, gerçeğin kötü olmalı",
+  "Yüz'ün emoji olmalı, hep aynı expresyon",
+  "Banner'ın siyah mı, ruh halinin mi?",
+  "Pfp'ni ne zaman değiştireceksin ya?",
+  "Fotoğraf arşivinde hiç iyi foto var mı?",
   
   // Kişilik Disseri
-  "Kanka deme, seninle chat bile sıkıntı veriyor",
-  "Komik olmaya çalışma, sen doğuştan giymiş hale gelmişsin",
-  "Meme'lerin bile meme yapılıyor",
-  "Pozitif ol deseler, sen neg olursun",
-  "Beynin kapalı mıydı ne, en basit şey anlamıyorsun",
-  "Sessiz kalsaydın, aptal görünmezdin",
-  "Seni tanıdığım günden pişmanım",
+  "Pozitif olun dediler, sen negatif oldum",
+  "Karakter geliştirmen -100 yolundaydı, başarılı oldun",
+  "Kişilik'in debug'a alınması lazım ciddi",
+  "Vibe'ın kilogram başına negatif",
+  "Enerjin draining, etrafındakileri siyah deliğe çekiyor",
+  "Humor'un dark mode'da bile gözükmüyor",
+  
+  // İnternet/Tech Disseri
+  "Internet hızın morse code seviyesinde",
+  "Ping'in time machine'e gidiyor kadar yüksek",
+  "Download'ında kaç saat bekliyorsun?",
+  "WiFi sinyal'inde negatif dB yok mu?",
+  "Router'ı kıbleye döndürsem daha iyi sinyal alır",
+  "Connection'un dial-up tüpü gibi çıkıyor",
   
   // Genel Saplamalar
-  "Seni troll listesinden çıkarmayız, sen trollüsün",
-  "Discord tarihinin en garip yüz ifadesi sensin",
-  "Bot'tan daha insan gibi davranmayı öğren",
-  "Kaç dakika daha sıkıntı vermeyecek misin?",
-  "Şanslı değil misin, senin gibi pist olmayan insan yok",
-  "Hayatın bir tutorial bile olsa öğrenemezdin",
-  "Flute çal, sesini duyacağız sanmıştım",
-  "Şu anda harita'dan senin koordinatlarını silmek istiyorum",
-  "İnsan değilsin, bir veri hatası mısın?",
-  "Senin için 'silent' modu patent ettirmeli Discord"
+  "Hayatin bugged out, developer'a bug report et",
+  "Update'in gerekli ama açılmıyorsun",
+  "Config'in resetlenmesi gerekiyor ciddi",
+  "Optimize et kendini, boşu boşuna CPU harcıyorsun",
+  "RAM'in yetmiyor, process'i kapat",
+  "System restart gerekli, kapıyı çal kal",
+  "Antivirus seni tehdit algıladı",
+  "Firewall arkasında gizlen, daha iyi olur",
+  "Şifreni değiştir, biri seni crack edebilir",
+  "Seni hacklemek değil, diz çöktürmek lazım",
+  "Seninle sohbet etmek DDoS attack gibi hissettiriyor",
+  "Egona virus bulaştı demek ki",
+  "Bios'una reset atsan belki düzelebilir",
+  "Driver'ın outdated, güncelleyemez misin?",
+  "Keyboard'unda sticky key mi var neyi yazıyorsun?",
+  "Touchpad'inde cursor gibi zıplamıyor mu?"
 ];
+
 
 // Hiyerarşi seviyesi al
 function getHierarchyLevel(member, cfg) {
@@ -1975,6 +1984,31 @@ async function handleCommand({ client, message, cfg }) {
     
     const dissMessage = formatMessage('💀', 'Diss Atıldı', `${member}\n\n${randomDiss}`);
     await message.reply(dissMessage);
+    return;
+  }
+
+  if (cmd === 'diss') {
+    const user = parseUserFromMessage(message, args);
+    if (!user) {
+      await message.reply('Kullanım: `.diss @uye` veya `.diss <id>`');
+      return;
+    }
+
+    const member = await fetchMember(message.guild, user);
+    if (!member) return message.reply('Üye bulunamadı.');
+
+    // Random diss seç
+    const randomDiss = dissLines[Math.floor(Math.random() * dissLines.length)];
+    
+    await message.reply({
+      embeds: [
+        baseEmbed('💀 DİSS ATILDI', 0xff6b6b)
+          .setDescription(`**${member.user.tag}**\n\n"${randomDiss}"`)
+          .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+          .setColor(0xff6b6b)
+          .setFooter({ text: `🔥 Kıyamet Koptu | ${new Date().toLocaleTimeString('tr-TR')}` })
+      ]
+    });
     return;
   }
 
