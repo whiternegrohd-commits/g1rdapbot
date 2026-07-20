@@ -846,6 +846,51 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
 
+  if (cmd === 'fal' || cmd === 'günün-sözü' || cmd === 'tavsiye') {
+    const fortunes = [
+      "Gelecek planı yapıp bugünü zehir etme kanka, akışına bırak.",
+      "Para vardır ya da yok, huzur en önemli para kanka.",
+      "Başarısızlık değil, denememek başarısızlıktır.",
+      "Kendin ol, başkaları zaten yapıyor.",
+      "Çok stresli olma kanka, hepsi bitti çünkü. Şaka şaka, yeni başlangıçlar var.",
+      "Hayat seni yıkar ama sen yeniden inşa et, daha güçlü ol.",
+      "Birini seviyorsan söyle kanka, dünyanın sonu olacak mı?",
+      "Yanılmaktan korku sen, yanılmaktan öğren.",
+      "Bugün yaptığın en küçük şey, yarın büyük etki yapabilir.",
+      "Mutsuzluğun sırrı başkalarının hayatını yaşamak kanka.",
+      "Her sabah yeni bir şans, kaçırma bunu.",
+      "Sessiz kalmak da bir karar, seçimini yap.",
+      "Ölene kadar öğrenecek çok şey var, merak et.",
+      "Kırmak kolay, ama onarmak güzel hissi veriyor.",
+      "Korku, gerçekleşmeden bitmek istediğin şeydir.",
+      "Hıçkırarak da gül, ama gül yani.",
+      "Yalnızlık kötü değil, yanlış insanlar kötü.",
+      "Bugün kötü, yarın iyiye benzese bile, sonrası daha iyi.",
+      "Hayal kur ama ayaklarını yere basma.",
+      "Evet demek de hayır demek de cesaret istiyor kanka.",
+      "Seni sevenler sanat, sevenmeyanlar kız.",
+      "Ufak adımlar da adım, koşma ama düşme.",
+      "Sabah kalkmak için bir sebep bul, o sebep kendine yeterli.",
+      "Geçmiş kapandı, bugün açılı, geleceğe hazırlan.",
+      "Gülüş bulaşıcıdır, dağıt etrafına.",
+      "En iyi plan, başlamak kanka."
+    ];
+
+    const randomFortune = fortunes[Math.floor(Math.random() * fortunes.length)];
+
+    const embed = baseEmbed('🔮 GÜNÜN TAVSİYESİ', 0x9c27b0)
+      .setDescription(
+        `> "${randomFortune}"\n\n` +
+        `✨ *Bugünün kaderiymiş*`
+      )
+      .setColor(0x9c27b0)
+      .setThumbnail(message.author.displayAvatarURL({ size: 256 }))
+      .setFooter({ text: `${message.author.username} için • ${new Date().toLocaleTimeString('tr-TR')}` });
+
+    await message.reply({ embeds: [embed] });
+    return;
+  }
+
   // Admin gerektiren komutlar
   if (!isAdmin(message.member, cfg) && !isSuperUser(message.member)) {
     await message.reply('Bu komutu kullanmak için yetkin yok.');
