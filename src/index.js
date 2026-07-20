@@ -931,6 +931,27 @@ client.on('messageCreate', async (message) => {
       trackSpam(userId, 'link');
     }
     
+    // 4. Mention spam (@everyone/@here blocker)
+    if (message.mentions.has(message.guild.roles.everyone)) {
+      // @everyone mention
+      await message.delete().catch(() => {});
+      await message.author.send({ content: `⛔ **@everyone Mention Yasak!**\n\nGirdap Sunucusu'nda @everyone veya @here mention'ı yapılamaz.\nLütfen normal şekilde yazınız.` }).catch(() => {});
+      
+      const mentionMsg = formatMessage('🚫', '@everyone Mention Bloklandi', `${message.author}\nKanal: <#${message.channelId}>\nİçerik: ${safeTruncate(content, 100)}`);
+      await sendToChannel(client, cfg.logChannels.guard, mentionMsg);
+      return;
+    }
+    
+    // @here mention blocker
+    if (content.includes('@here')) {
+      await message.delete().catch(() => {});
+      await message.author.send({ content: `⛔ **@here Mention Yasak!**\n\nGirdap Sunucusu'nda @everyone veya @here mention'ı yapılamaz.\nLütfen normal şekilde yazınız.` }).catch(() => {});
+      
+      const mentionMsg = formatMessage('🚫', '@here Mention Bloklandi', `${message.author}\nKanal: <#${message.channelId}>\nİçerik: ${safeTruncate(content, 100)}`);
+      await sendToChannel(client, cfg.logChannels.guard, mentionMsg);
+      return;
+    }
+    
     // Mesaj sayısını track et
     addMessageCount(message.guild.id, message.author.id, message.channelId, new Date());
   }
