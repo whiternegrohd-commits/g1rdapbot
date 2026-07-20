@@ -304,13 +304,13 @@ function helpText(prefix) {
     `\`${prefix}fullyt\` (sunucu sahibi / full admin)\n` +
     `\`${prefix}lock\` (admin - kanalı kilitle)\n` +
     `\`${prefix}unlock\` (admin - kanalı aç)\n` +
+    `\`${prefix}purge <1-100>\` (Owner rolü: her yerde, diğerleri: commands channel)\n` +
     `\`${prefix}ban @uye [sebep]\`\n` +
     `\`${prefix}forceban <userId> [sebep]\` (sunucudan ayrılmışları da banla)\n` +
     `\`${prefix}unban <userId> [sebep]\` (ban'ı kaldır)\n` +
     `\`${prefix}kick @uye [sebep]\`\n` +
     `\`${prefix}timeout @uye <dakika> [sebep]\`\n` +
     `\`${prefix}untimeout @uye [sebep]\`\n` +
-    `\`${prefix}purge <1-100>\`\n` +
     `\`${prefix}warn @uye [sebep]\`\n` +
     `\`${prefix}warnings @uye\`\n` +
     `\`${prefix}unwarn @uye <warnId>\`\n` +
@@ -2009,6 +2009,38 @@ async function handleCommand({ client, message, cfg }) {
           .setFooter({ text: `🔥 Kıyamet Koptu | ${new Date().toLocaleTimeString('tr-TR')}` })
       ]
     });
+    return;
+  }
+
+  if (cmd === 'purge' || cmd === 'temizle') {
+    // Owner rolüne her yerde izin, diğerleri sadece commands channel'da
+    const ownerRoleId = '1509707234408398898';
+    const hasOwnerRole = message.member.roles.cache.has(ownerRoleId);
+    
+    if (!hasOwnerRole) {
+      // Owner rolü yoksa command channel kontrolü
+      if (cfg.commandsChannelId && message.channelId !== cfg.commandsChannelId) {
+        await message.reply(`❌ Bu komutu sadece <#${cfg.commandsChannelId}> kanalında kullanabilirsin.`);
+        return;
+      }
+    }
+
+    const n = Number(args[0]);
+    const max = cfg.limits?.purgeMax ?? 100;
+    if (!Number.isFinite(n) || n < 1 || n > max) {
+      await message.reply(`Sayı 1-${max} arasında olmalı.`);
+      return;
+    }
+
+    try {
+      const deleted = await message.channel.bulkDelete(n, true).catch(() => null);
+      const successMsg = await message.reply(`✅ **${deleted?.size ?? 0}** mesaj silindi.`);
+      
+      // 3 saniye sonra sil
+      setTimeout(() => successMsg.delete().catch(() => {}), 3000);
+    } catch (e) {
+      await message.reply(`❌ Purge başarısız: ${e.message}`);
+    }
     return;
   }
 
