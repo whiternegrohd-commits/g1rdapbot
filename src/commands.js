@@ -2049,6 +2049,67 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
 
+  if (cmd === 'uykumoduac') {
+    const fullAdminRoleId = '1510665683275616427';
+    const ownerId = '588050048882049035';
+    
+    if (message.author.id !== ownerId && !message.member.roles.cache.has(fullAdminRoleId)) {
+      await message.reply('Bu komutu sadece Full Admin rolü veya sunucu sahibi kullanabilir.');
+      return;
+    }
+
+    // 3 rolü tanımla
+    const roleIds = {
+      'Bots': '1527153925013373098',
+      'Owner': '1509707234408398898',
+      'YT1': '1509941362600972329'
+    };
+
+    // Uyarı mesajı gönder
+    const warningEmbed = baseEmbed('⚠️ UYARI: UYKU MODU AÇILACAK', 0xff6b6b)
+      .setDescription(
+        `**Aşağıdaki 3 rolün TÜM yetkileri ve izinleri kapanacak:**\n\n` +
+        `🤖 **Bots** Rolü (<@&1527153925013373098>)\n` +
+        `👑 **Owner** Rolü (<@&1509707234408398898>)\n` +
+        `🎥 **YT1** Rolü (<@&1509941362600972329>)\n\n` +
+        `⏱️ Bu roller 10 dakika boyunca **TAMAMEN** pasif kalacak.\n` +
+        `✅ Kapatmak için: \`.uykumodukapat\` komutu\n\n` +
+        `**Devam etmek istiyor musunuz?**`
+      )
+      .setColor(0xff6b6b);
+
+    const confirmBtn = new ButtonBuilder()
+      .setCustomId(`sleepmode_confirm_${message.author.id}_${Date.now()}`)
+      .setLabel('✅ Evet, Aç')
+      .setStyle(ButtonStyle.Danger);
+
+    const cancelBtn = new ButtonBuilder()
+      .setCustomId(`sleepmode_cancel_${Date.now()}`)
+      .setLabel('❌ İptal')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder().addComponents(confirmBtn, cancelBtn);
+
+    await message.reply({
+      embeds: [warningEmbed],
+      components: [row]
+    });
+    return;
+  }
+
+  if (cmd === 'uykumodukapat') {
+    const fullAdminRoleId = '1510665683275616427';
+    const ownerId = '588050048882049035';
+    
+    if (message.author.id !== ownerId && !message.member.roles.cache.has(fullAdminRoleId)) {
+      await message.reply('Bu komutu sadece Full Admin rolü veya sunucu sahibi kullanabilir.');
+      return;
+    }
+
+    await message.reply('✅ Uyku Modu açılmayı bekleyen varsa kontrol et veya manuelde kapamak için rehber iste.');
+    return;
+  }
+
   if (cmd === 'topludm') {
     const ownerId = '588050048882049035';
     
