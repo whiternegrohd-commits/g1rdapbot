@@ -38,6 +38,7 @@ const {
 const { addMessageCount, addVoiceDurationSplit, getJails, removeJail, isVipGranted } = require('./storage');
 const { releaseMemberFromJail } = require('./jail');
 const { createBackup, cleanOldBackups } = require('./backup');
+const { logMemberActivity, logBotInternal, logCommandUsage } = require('./logger');
 
 // Silinen mesajları takip et (guildId:channelId -> { author, content, at })
 const deletedMessages = new Map();
@@ -103,6 +104,17 @@ async function findRoleUpdateExecutor(member) {
 
 client.on('ready', async () => {
   console.log(`✅ Bot giriş yaptı: ${client.user.tag}`);
+  
+  // Bot internal log
+  logBotInternal({
+    client,
+    cfg,
+    level: 'SUCCESS',
+    title: 'Bot Başlatıldı',
+    message: `${client.user.tag} başarılı bir şekilde başlatıldı.`,
+    details: `Guilds: ${client.guilds.cache.size} • Users: ${client.users.cache.size}`
+  });
+  
   if (cfg.guildId) {
     console.log(`📌 İzin verilen sunucu: ${cfg.guildId}`);
     await leaveForeignGuilds();
@@ -1730,6 +1742,16 @@ client.on('error', (e) => {
   // Gereksiz hata log'larını filtrele
   if (e.message.includes('Unknown interaction')) return;
   console.error('[ERROR]', e.message);
+  
+  // Bot internal log
+  logBotInternal({
+    client,
+    cfg,
+    level: 'ERROR',
+    title: 'Bot Hatası',
+    message: e.message,
+    details: e.stack
+  });
 });
 
 if (!process.env.DISCORD_TOKEN) {

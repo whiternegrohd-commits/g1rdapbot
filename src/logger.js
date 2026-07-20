@@ -49,5 +49,69 @@ module.exports = {
   sendToChannel,
   sendDM,
   baseEmbed,
-  formatMessage
+  formatMessage,
+  logMemberActivity,
+  logBotInternal,
+  logCommandUsage
 };
+
+// Advanced Logging Functions
+
+function logMemberActivity({ client, cfg, user, action, details = '' }) {
+  const embed = baseEmbed('📊 MEMBER ACTIVITY', 0x5865f2)
+    .setDescription(
+      `👤 **Üye:** ${user}\n` +
+      `📋 **İşlem:** ${action}\n` +
+      `${details ? `📝 **Detay:** ${details}\n` : ''}` +
+      `⏰ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+    )
+    .setThumbnail(user.displayAvatarURL({ size: 256 }))
+    .setColor(0x5865f2);
+
+  sendToChannel(client, cfg.logChannels.memberActivity, { embeds: [embed] }).catch(() => {});
+}
+
+function logBotInternal({ client, cfg, level = 'INFO', title, message, details = '' }) {
+  const colorMap = {
+    'INFO': 0x5865f2,
+    'WARN': 0xffa500,
+    'ERROR': 0xff0000,
+    'SUCCESS': 0x00ff00
+  };
+
+  const emoji = {
+    'INFO': 'ℹ️',
+    'WARN': '⚠️',
+    'ERROR': '❌',
+    'SUCCESS': '✅'
+  };
+
+  const embed = baseEmbed(`${emoji[level]} ${title}`, colorMap[level])
+    .setDescription(
+      `📌 **Seviye:** ${level}\n` +
+      `📝 **Mesaj:** ${message}\n` +
+      `${details ? `📋 **Detay:** ${safeTruncate(details, 500)}\n` : ''}` +
+      `⏰ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+    )
+    .setColor(colorMap[level]);
+
+  sendToChannel(client, cfg.logChannels.botInternal, { embeds: [embed] }).catch(() => {});
+}
+
+function logCommandUsage({ client, cfg, member, command, args, success = true, error = null }) {
+  const statusEmoji = success ? '✅' : '❌';
+  const statusColor = success ? 0x00ff00 : 0xff0000;
+
+  const embed = baseEmbed(`${statusEmoji} COMMAND EXECUTED`, statusColor)
+    .setDescription(
+      `👤 **Üye:** ${member}\n` +
+      `📝 **Komut:** \`${command}\`\n` +
+      `${args.length > 0 ? `📋 **Args:** \`${args.join(' ')}\`\n` : ''}` +
+      `${error ? `⚠️ **Hata:** ${error}\n` : ''}` +
+      `⏰ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+    )
+    .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+    .setColor(statusColor);
+
+  sendToChannel(client, cfg.logChannels.botInternal, { embeds: [embed] }).catch(() => {});
+}
