@@ -272,6 +272,7 @@ function helpText(prefix) {
   return (
     `**Komutlar**\n` +
     `\`${prefix}help\`\n` +
+    `\`${prefix}developer\` / \`${prefix}dev\` (bot hakkında)\n` +
     `\`${prefix}snipe\` (silinen mesajı göster)\n` +
     `\`${prefix}b <nick>\` (nick)\n` +
     `\`${prefix}isim @uye <nick>\` (nick)\n` +
@@ -280,6 +281,8 @@ function helpText(prefix) {
     `\`${prefix}top\` / \`${prefix}leaderboard\`\n` +
     `\`${prefix}url\`\n` +
     `\`${prefix}diss @uye\` (random diss at)\n` +
+    `\`${prefix}fal\` / \`${prefix}günün-sözü\` (tavsiye)\n` +
+    `\`${prefix}ship @kişi1 @kişi2\` (ship calculator)\n` +
     `\`${prefix}rollog @uye\` (rol geçmişi)\n` +
     `\`${prefix}jail\` / \`${prefix}j\` (admin)\n` +
     `\`${prefix}unjail\` / \`${prefix}uj\` (admin)\n` +
@@ -2021,6 +2024,40 @@ async function handleCommand({ client, message, cfg }) {
       console.error('[TOPLUDM] Hata:', e.message);
       await message.reply(`Hata: ${e.message}`);
     }
+    return;
+  }
+
+  if (cmd === 'developer' || cmd === 'dev') {
+    await message.reply({
+      embeds: [
+        baseEmbed('👨‍💻 BOT HAKKINDA', 0x5865f2)
+          .setDescription(
+            `**Girdap Bot** — Discord moderasyon ve yönetim botunun profesyonel sürümüdür.\n\n` +
+            `📌 **Geliştirici:** Toprak Demirşoy\n` +
+            `🏢 **Sunucu:** Girdap Community\n` +
+            `📅 **Başlangıç:** 2024\n\n` +
+            `✨ **Özellikler:**\n` +
+            `• Gelişmiş moderasyon sistemi (Ban, Kick, Timeout, Jail)\n` +
+            `• Rütbe hiyerarşisi ve izin yönetimi\n` +
+            `• İstatistik ve leaderboard sistemi\n` +
+            `• Ses kanalı ve mesaj takibi\n` +
+            `• Uyku Modu (Sleep Mode) güvenlik\n` +
+            `• Guard sistemi (spam, webhook, url koruması)\n` +
+            `• İleri logging ve audit sistemi\n` +
+            `• Uyarı (warn) ve ceza mekanizması\n` +
+            `• Rol yönetimi ve whitelist\n` +
+            `• Günlük tavsiye ve eğlence komutları\n\n` +
+            `🛡️ **Güvenlik:**\n` +
+            `Açık kod, transparan işlem, maksimum güvenlik.\n` +
+            `Tüm kullanıcı verileri lokal olarak saklanır.\n\n` +
+            `📞 **Destek:** Girdap Sunucusu'na katıl\n` +
+            `🔗 Discord: discord.gg/girdap`
+          )
+          .setThumbnail('https://cdn.discordapp.com/app-icons/1509152651294822501/a_9c27b0b3e4f8c2d1e6a5b4c3f2e1d0a9.gif')
+          .setColor(0x5865f2)
+          .setFooter({ text: '✅ Girdap Bot — Profesyonel Moderasyon Çözümü', iconURL: message.guild.iconURL({ size: 64 }) })
+      ]
+    });
     return;
   }
 
