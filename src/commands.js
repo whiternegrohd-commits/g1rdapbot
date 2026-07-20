@@ -873,7 +873,37 @@ async function handleCommand({ client, message, cfg }) {
       "Sabah kalkmak için bir sebep bul, o sebep kendine yeterli.",
       "Geçmiş kapandı, bugün açılı, geleceğe hazırlan.",
       "Gülüş bulaşıcıdır, dağıt etrafına.",
-      "En iyi plan, başlamak kanka."
+      "En iyi plan, başlamak kanka.",
+      "İnsanlar sana hatırlattığın şeyle hatırlanır, iyi seç.",
+      "Affetme çünkü iyi insan değiller, affet çünkü sen iyisin.",
+      "Hayatın anlamı, anlam verdiğin şeydir.",
+      "Beklemek de yaşamak değil, yaşamak için hareket et.",
+      "Sessizlik bazen en güçlü cevaptır kanka.",
+      "Hata yapmak insan, hata öğrenmekse akıllı olmak.",
+      "Bugün ne yapıyorsan, gelecek sana teşekkür edecek.",
+      "Kendine söyle, 'ben yapabilirim' ve başla.",
+      "Çünkü hayat şimdi, sonra değil.",
+      "En büyük zafer, kendi üzerindekileri fethetmektir.",
+      "Kaygın düşün ama bu seni paraliz etmesin.",
+      "Yalnız hissetme, milyon kişi seninle ruh eşinin aradı.",
+      "Başarı, şans değil, çalışma ve sabırlılıktır.",
+      "Birileri seni umursamamıyor, ama umursayan var.",
+      "Bugün zorluksa, yarın hikaye olacak.",
+      "Kendini hiç küçültme, kimse senin boyutunu belirlemez.",
+      "Gülmek tedavi eder, kahkaha yapabiliyorsan yapıl.",
+      "Asıl cesaret, korkmuş olduğunu bilemiyerek ilerlemektir.",
+      "Hayat hikayedir, sen yazarısın.",
+      "Uyur iken rüya görürsün, uyanıkken rüya yaşarsın.",
+      "Hiçbir şey kalıcı değil, bu da kötü günleri kurtarır.",
+      "Sevgi en ucuz ama en pahalı şey kanka.",
+      "Bugün zorluksa, sen daha zor işleri de yapabilirsin.",
+      "Var olmak bile bir başarıdır kanka, devam et.",
+      "Bilen konuşmaz, konuşan bilmez. Sessiz kal bazen.",
+      "İnsanlar unutur ama aşk hatırlanır.",
+      "Yolunda yürü, geri bakmadan, düşüp kalkmakla ilerliyorsun.",
+      "Çünkü sen değerlisin, sana şüphe ettirecek kimse bulmayacaksın.",
+      "Güzel şeyler zamanı gelince gelir, acele etme.",
+      "Kalbini dinle, beyni çok konuşuyor zaten."
     ];
 
     const randomFortune = fortunes[Math.floor(Math.random() * fortunes.length)];
@@ -1991,6 +2021,79 @@ async function handleCommand({ client, message, cfg }) {
       console.error('[TOPLUDM] Hata:', e.message);
       await message.reply(`Hata: ${e.message}`);
     }
+    return;
+  }
+
+  if (cmd === 'fal' || cmd === 'günün-sözü' || cmd === 'tavsiye') {
+    const advices = [
+      'Gelecek planı yapıp bugünü zehir etme kanka, akışına bırak.',
+      'Başkasının hayatını kıskanmak yerine kendine bak, sen yetersin.',
+      'Hata yapmak insanın doğası, başarı onu kabullemekten sonra gelir.',
+      'Seni mutlu etmeyen insanlar için vakit harcama, hayat kısa.',
+      'Bugün yapacağın bir şey 10 gün sonra yapcağından daha değerli.',
+      'Gözlerine bakarak söylediğine inan, başka kimse inanmasa da.',
+      'Yalnız olmaktan daha iyi mi? Evet, çünkü sen yetersin.',
+      'Sessiz kal ve gözlemle, çünkü akıllılar çok konuşmaz.',
+      'İnsanlar seni nasıl görüyor umurunda değilse, o zaman gerçek özgürsün.',
+      'Çok bilenlerin hiçbir şeyi yok, hiçbir şey bilmeyenlerin her şeyi var.',
+      'Hayat bekleme oyunu değil, hareket oyunu kanka.',
+      'Kötü günler gelecek ama sen daha güçlü çıkacaksın.',
+      'İsmini yaşat, parayı değil; çünkü para unutulur ama isim kalır.',
+      'Sadece sen bilirsin ne içinde var, başkasına gösterme.',
+      'Küçük şeyler önemli, büyük hayaller de ama en önemlisi bugün yaşamak.',
+      'Düşündüğün kadar iyi misin? Belki de çok daha iyisin.',
+      'Zaman hepimizi eşit yönetiyor, onu akıllı kullan.',
+      'Kimse senin hikayeyi yazmayacak, sen yaz.',
+      'Mutluluk bir destinasyon değil, yolculuğun kendisidir.',
+      'Seni anlayan 10 kişi, anlamayan 1000 kişiden daha değerli.',
+      'Özür dileme söylediğin için, bunu yapması gerekeni yaptığın için.',
+      'Hayal gör ama uyanıkken, o zaman gerçek olur.',
+      'Her başarı bir hayatın hikayesidir, senin hikayeni yaz.',
+      'Bilgelik soru sormaktan başlar, cevap vermekten değil.',
+      'Stres için zamanın yok, vakit kalmamış hedefleriniz için.',
+      'Biri seni hayal kırıklığına uğrattıysa, ona aldırma; seni hayal etmedi ki.',
+      'Yolda kayıp olmak, yolu bulunmamak kadar kötü değil.',
+      'Bir gün olur da bunu anlatırken gülersin, o zaman sabrın değeri anlaşılır.',
+      'Adım adım gelmiyorsa koş, durma!',
+      'Geçmiş, geçmiş diye hayatını boşa harcama, gelecek beklemiyor.',
+      'Paramız olmasa da onurumuz var, ona sahip çık.',
+      'Her insanın bir kırılma noktası var, seninki nereye kadar gidecek?',
+      'Sessiz olanlar en çok söylüyor, dinlemeyi öğren.',
+      'Başarı bir yolculuk, bir varış noktası değil kanka.',
+      'İnsanlar seni yargılayacak, sende kendini yargılama.',
+      'Aynada gördüğün yüzü sev, çünkü o seni hiç aldatmaz.',
+      'Hayat bir imtihan, sınavı geçmen lazım; geçemedin mi tekrar gir.',
+      'Kalbini dinle, beyni yalnız bırakma; ikisi birlikte çalış.',
+      'Dünya döndükçe sen de dön, yerlerde kalma.',
+      'Seninle yarış yapan kişi seninle yarışmaz, başkasıyla kendini kıyaslar.',
+      'Yanlış insanlar seni bulur ama doğru insanlar seni seçer.',
+      'Rüya görmek güzel ama rüya yaşamak çok daha güzel.',
+      'Bir kapı kapanırsa 100 kapı açılır, çıkış bul.',
+      'Sorular sorma, kendin bul cevapları; o zaman taş gibi durur.',
+      'Acı çeker misin? Güzel, çünkü hala yaşıyorsun demektir.',
+      'İyi bir insanın sözü altından vardır, kulak ver.',
+      'Kendine söyle: Bundan da güçlü çıkacağım!',
+      'Başkasının yaşadığı hayata özenmek yerine, sende hangisi var bak.',
+      'Çok seversen çok kaybedersin, ama yaşamak budur kanka.',
+      'Hisset, ağla, gül, salla; çünkü bu hayatın tadı budur.',
+      'Seni sevenler para için gelir mi? Gelmiyorsa o zaman gerçek sevgi vardır.',
+      'Bugün imkansız görünen şey yarın mümkün olur, sabırla bekle.',
+      'Her sabah yeni bir başlangıç, geçmişi arkada bırak.',
+      'Sessiz olanlar dinlemek için sessiz, gürültüdekiler ise boş konuşmak için.',
+      'Senin hikayenin sonu henüz yazılmadı, endişelenme.'
+    ];
+
+    const randomAdvice = advices[Math.floor(Math.random() * advices.length)];
+    
+    await message.reply({
+      embeds: [
+        baseEmbed('🔮 GÜNÜN TAVSİYESİ', 0x9c27b0)
+          .setThumbnail(message.author.displayAvatarURL({ size: 256 }))
+          .setDescription(`"${randomAdvice}"`)
+          .setColor(0x9c27b0)
+          .setFooter({ text: `💭 ${new Date().toLocaleTimeString('tr-TR')}`, iconURL: message.author.displayAvatarURL({ size: 64 }) })
+      ]
+    });
     return;
   }
 
