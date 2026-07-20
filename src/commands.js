@@ -1760,8 +1760,8 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
 
-  // Bilinmeyen komut
-  await message.reply(`Bilinmeyen komut. \`${prefix}help\` yaz.`);
+  // Bilinmeyen komut - sessiz geç
+  return;
 }
 
 module.exports = {
