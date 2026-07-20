@@ -449,6 +449,9 @@ const voiceSessions = new Map();
 // Spam tracking (userId -> { messages, links, emojis, warnings, lastCheck })
 const spamTracker = new Map();
 
+// Mention spam tracking (userId -> { count, lastAt })
+const mentionSpamTracker = new Map();
+
 function trackSpam(userId, type) {
   const now = Date.now();
   const tracker = spamTracker.get(userId) || { 
@@ -931,25 +934,37 @@ client.on('messageCreate', async (message) => {
       trackSpam(userId, 'link');
     }
     
-    // 4. Mention spam (@everyone/@here blocker)
-    if (message.mentions.has(message.guild.roles.everyone)) {
-      // @everyone mention
-      await message.delete().catch(() => {});
-      await message.author.send({ content: `⛔ **@everyone Mention Yasak!**\n\nGirdap Sunucusu'nda @everyone veya @here mention'ı yapılamaz.\nLütfen normal şekilde yazınız.` }).catch(() => {});
-      
-      const mentionMsg = formatMessage('🚫', '@everyone Mention Bloklandi', `${message.author}\nKanal: <#${message.channelId}>\nİçerik: ${safeTruncate(content, 100)}`);
-      await sendToChannel(client, cfg.logChannels.guard, mentionMsg);
-      return;
+    // 4. Mention spam (@everyone/@here blocker) - 1 kere izin, 2. kere block
+    const mentionData = mentionSpamTracker.get(userId) ?? { count: 0, lastAt: 0 };
+    const now = Date.now();
+    
+    // 24 saati aşmışsa reset et
+    if (now - mentionData.lastAt > 24 * 60 * 60 * 1000) {
+      mentionData.count = 0;
     }
     
-    // @here mention blocker
-    if (content.includes('@here')) {
-      await message.delete().catch(() => {});
-      await message.author.send({ content: `⛔ **@here Mention Yasak!**\n\nGirdap Sunucusu'nda @everyone veya @here mention'ı yapılamaz.\nLütfen normal şekilde yazınız.` }).catch(() => {});
+    const hasMentionEveryone = message.mentions.has(message.guild.roles.everyone);
+    const hasHereMention = content.includes('@here');
+    
+    if (hasMentionEveryone || hasHereMention) {
+      mentionData.count++;
+      mentionData.lastAt = now;
+      mentionSpamTracker.set(userId, mentionData);
       
-      const mentionMsg = formatMessage('🚫', '@here Mention Bloklandi', `${message.author}\nKanal: <#${message.channelId}>\nİçerik: ${safeTruncate(content, 100)}`);
-      await sendToChannel(client, cfg.logChannels.guard, mentionMsg);
-      return;
+      if (mentionData.count >= 2) {
+        // 2. kere - block et
+        await message.delete().catch(() => {});
+        await message.author.send({ content: `⛔ **Mention Spam Yasak!**\n\nGirdap Sunucusu'nda @everyone veya @here mention'ı bir kez yapılabilir.\nSiz zaten bunu yaptınız ve tekrar denediğiniz için mesajınız silindi.` }).catch(() => {});
+        
+        const mentionMsg = formatMessage('🚫', 'Mention Spam Bloklandi (2. Kere)', `${message.author}\nKanal: <#${message.channelId}>\nTip: ${hasMentionEveryone ? '@everyone' : '@here'}`);
+        await sendToChannel(client, cfg.logChannels.guard, mentionMsg);
+        return;
+      } else {
+        // 1. kere - uyar et
+        const warnMsg = formatMessage('⚠️', 'Mention Spam Uyarısı (1. Kere)', `${message.author}\nTip: ${hasMentionEveryone ? '@everyone' : '@here'}\nNot: Bir daha yaparsanız mesajınız silinecektir!`);
+        await sendToChannel(client, cfg.logChannels.guard, warnMsg);
+        return;
+      }
     }
     
     // Mesaj sayısını track et
