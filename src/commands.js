@@ -18,7 +18,7 @@ const {
   removeSleepMode
 } = require('./storage');
 const { releaseMemberFromJail } = require('./jail');
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 
 // DISS CÜMLELERİ - IQ'lu ve Kapsamlı
 const dissLines = [
@@ -295,6 +295,7 @@ function helpText(prefix) {
     `\`${prefix}fal\` / \`${prefix}günün-sözü\` (tavsiye)\n` +
     `\`${prefix}ship @kişi1 @kişi2\` (ship calculator)\n` +
     `\`${prefix}rollog @uye\` (rol geçmişi)\n` +
+    `\`${prefix}wh\` (whitelist dashboard - SuperAdmin)\n` +
     `\`${prefix}jail\` / \`${prefix}j\` (admin)\n` +
     `\`${prefix}unjail\` / \`${prefix}uj\` (admin)\n` +
     `\`${prefix}vip\` (admin)\n` +
@@ -2299,6 +2300,195 @@ async function handleCommand({ client, message, cfg }) {
           .setFooter({ text: `💭 ${new Date().toLocaleTimeString('tr-TR')}`, iconURL: message.author.displayAvatarURL({ size: 64 }) })
       ]
     });
+    return;
+  }
+
+  // Whitelist Dashboard
+  if (cmd === 'wh' || cmd === 'whitelist') {
+    const superAdminRoleId = '1524180623852441610';
+    const ownerId = '588050048882049035';
+    const hasPermission = message.author.id === ownerId || message.member.roles.cache.has(superAdminRoleId);
+    if (!hasPermission) {
+      await message.reply('❌ Bu komutu sadece SuperAdmin rolü veya sunucu sahibi kullanabilir.');
+      return;
+    }
+
+    const whitelistedUsers = cfg.whitelistedUserIds || [];
+    
+    // Üyeleri getir
+    let userDetails = [];
+    for (const userId of whitelistedUsers) {
+      try {
+        const member = await message.guild.members.fetch(userId).catch(() => null);
+        if (member) {
+          userDetails.push({ id: userId, tag: member.user.tag, username: member.user.username });
+        } else {
+          userDetails.push({ id: userId, tag: 'Ayrıldı', username: 'Unknown' });
+        }
+      } catch (e) {
+        userDetails.push({ id: userId, tag: 'Hata', username: 'Unknown' });
+      }
+    }
+
+    // Üyeleri sayfa olarak göster (10 per page)
+    const perPage = 10;
+    const totalPages = Math.ceil(userDetails.length / perPage) || 1;
+    let currentPage = 1;
+
+    const getPageEmbed = (page) => {
+      const start = (page - 1) * perPage;
+      const end = start + perPage;
+      const pageUsers = userDetails.slice(start, end);
+      
+      const userLines = pageUsers.length > 0
+        ? pageUsers.map((u, i) => `${start + i + 1}. <@${u.id}> — \`${u.tag}\``).join('\n')
+        : '📭 Whitelist boş';
+
+      return baseEmbed('🛡️ WHITELIST DASHBOARD', 0x5865f2)
+        .setDescription(
+          `📊 **Toplam:** ${whitelistedUsers.length} kişi\n` +
+          `📄 **Sayfa:** ${page}/${totalPages}\n\n` +
+          `${userLines}`
+        )
+        .setColor(0x5865f2)
+        .setFooter({ text: `Sayfa ${page}/${totalPages} • Güncelleme: ${new Date().toLocaleTimeString('tr-TR')}` });
+    };
+
+    const addBtn = new ButtonBuilder()
+      .setCustomId(`wh_add_${message.author.id}`)
+      .setLabel('➕ Ekle')
+      .setStyle(ButtonStyle.Success);
+
+    const removeBtn = new ButtonBuilder()
+      .setCustomId(`wh_remove_${message.author.id}`)
+      .setLabel('➖ Çıkar')
+      .setStyle(ButtonStyle.Danger);
+
+    const refreshBtn = new ButtonBuilder()
+      .setCustomId(`wh_refresh_${message.author.id}`)
+      .setLabel('🔄 Yenile')
+      .setStyle(ButtonStyle.Secondary);
+
+    const prevBtn = new ButtonBuilder()
+      .setCustomId(`wh_prev_${message.author.id}`)
+      .setLabel('◀️')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(totalPages === 1);
+
+    const nextBtn = new ButtonBuilder()
+      .setCustomId(`wh_next_${message.author.id}`)
+      .setLabel('▶️')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(totalPages === 1);
+
+    const controlRow = new ActionRowBuilder().addComponents(addBtn, removeBtn, refreshBtn);
+    const navRow = new ActionRowBuilder().addComponents(prevBtn, nextBtn);
+
+    const components = totalPages > 1 ? [controlRow, navRow] : [controlRow];
+
+    const reply = await message.reply({
+      embeds: [getPageEmbed(currentPage)],
+      components: components
+    });
+
+    // Collector'ı ayarla
+    const collector = reply.createMessageComponentCollector({ 
+      time: 5 * 60 * 1000, // 5 dakika
+      filter: (i) => i.user.id === message.author.id 
+    });
+
+    collector.on('collect', async (interaction) => {
+      try {
+        const customId = interaction.customId;
+
+        if (customId === `wh_add_${message.author.id}`) {
+          await interaction.showModal(
+            new (require('discord.js')).ModalBuilder()
+              .setCustomId(`wh_add_modal_${message.author.id}`)
+              .setTitle('Whitelist\'e Üye Ekle')
+              .addComponents(
+                new (require('discord.js')).ActionRowBuilder().addComponents(
+                  new (require('discord.js')).TextInputBuilder()
+                    .setCustomId('wh_user_id')
+                    .setLabel('@mention veya User ID')
+                    .setPlaceholder('@kişi veya 123456789')
+                    .setStyle(1) // SHORT
+                    .setRequired(true)
+                )
+              )
+          );
+        } else if (customId === `wh_remove_${message.author.id}`) {
+          await interaction.showModal(
+            new (require('discord.js')).ModalBuilder()
+              .setCustomId(`wh_remove_modal_${message.author.id}`)
+              .setTitle('Whitelist\'ten Üye Çıkar')
+              .addComponents(
+                new (require('discord.js')).ActionRowBuilder().addComponents(
+                  new (require('discord.js')).TextInputBuilder()
+                    .setCustomId('wh_user_id')
+                    .setLabel('@mention veya User ID')
+                    .setPlaceholder('@kişi veya 123456789')
+                    .setStyle(1)
+                    .setRequired(true)
+                )
+              )
+          );
+        } else if (customId === `wh_refresh_${message.author.id}`) {
+          // Config'i yeniden oku
+          const path = require('path');
+          delete require.cache[require.resolve('./../config.json')];
+          const newCfg = require('./../config.json');
+          cfg.whitelistedUserIds = newCfg.whitelistedUserIds || [];
+          
+          whitelistedUsers.length = 0;
+          whitelistedUsers.push(...cfg.whitelistedUserIds);
+          
+          currentPage = 1;
+          userDetails = [];
+          for (const userId of whitelistedUsers) {
+            try {
+              const member = await message.guild.members.fetch(userId).catch(() => null);
+              if (member) {
+                userDetails.push({ id: userId, tag: member.user.tag, username: member.user.username });
+              } else {
+                userDetails.push({ id: userId, tag: 'Ayrıldı', username: 'Unknown' });
+              }
+            } catch (e) {
+              userDetails.push({ id: userId, tag: 'Hata', username: 'Unknown' });
+            }
+          }
+
+          await interaction.update({ embeds: [getPageEmbed(currentPage)] });
+        } else if (customId === `wh_prev_${message.author.id}`) {
+          if (currentPage > 1) {
+            currentPage--;
+            await interaction.update({ embeds: [getPageEmbed(currentPage)] });
+          }
+        } else if (customId === `wh_next_${message.author.id}`) {
+          if (currentPage < totalPages) {
+            currentPage++;
+            await interaction.update({ embeds: [getPageEmbed(currentPage)] });
+          }
+        }
+      } catch (e) {
+        console.error('[WH_DASHBOARD] Button hata:', e);
+        await interaction.reply({ content: `❌ Hata: ${e.message}`, ephemeral: true }).catch(() => {});
+      }
+    });
+
+    collector.on('end', () => {
+      const disabledComponents = components.map(row => {
+        const newRow = new ActionRowBuilder();
+        row.components.forEach(btn => {
+          if (btn instanceof ButtonBuilder) {
+            newRow.addComponents(ButtonBuilder.from(btn).setDisabled(true));
+          }
+        });
+        return newRow;
+      });
+      reply.edit({ components: disabledComponents }).catch(() => {});
+    });
+
     return;
   }
 

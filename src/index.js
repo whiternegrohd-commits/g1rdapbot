@@ -842,6 +842,128 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.message.edit({ components: [] }).catch(() => {});
     return;
   }
+
+  // MODAL HANDLER
+  if (!interaction.isModalSubmit()) return;
+
+  const modalCustomId = interaction.customId;
+
+  // WHITELIST ADD MODAL
+  if (modalCustomId.startsWith('wh_add_modal_')) {
+    const authorId = modalCustomId.split('_')[3];
+    
+    // Sadece komutu kullanan kişi gönderebilir
+    if (interaction.user.id !== authorId) {
+      await interaction.reply({ content: '❌ Sadece bu komutu kullanan kişi gönderebilir.', ephemeral: true });
+      return;
+    }
+
+    try {
+      const userInput = interaction.fields.getTextInputValue('wh_user_id');
+      if (!userInput) {
+        await interaction.reply({ content: '❌ Kullanıcı ID veya @mention gerekli.', ephemeral: true });
+        return;
+      }
+
+      // Parse user
+      let userId = userInput.replace(/[<@!>]/g, '');
+      if (!/^\d{16,20}$/.test(userId)) {
+        await interaction.reply({ content: '❌ Geçerli bir @mention veya User ID girin.', ephemeral: true });
+        return;
+      }
+
+      const member = await interaction.guild.members.fetch(userId).catch(() => null);
+      if (!member) {
+        await interaction.reply({ content: '❌ Üye bulunamadı veya sunucudan ayrılmış.', ephemeral: true });
+        return;
+      }
+
+      if (!cfg.whitelistedUserIds) cfg.whitelistedUserIds = [];
+
+      if (cfg.whitelistedUserIds.includes(userId)) {
+        await interaction.reply({ content: `⚠️ ${member} zaten whitelist'te.`, ephemeral: true });
+        return;
+      }
+
+      cfg.whitelistedUserIds.push(userId);
+      const fs = require('fs');
+      const path = require('path');
+      const configPath = path.join(__dirname, '..', 'config.json');
+      fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+
+      await interaction.reply({
+        content: `✅ ${member} whitelist'e eklendi.`,
+        ephemeral: true,
+        embeds: [
+          baseEmbed('✅ WHITELIST\'E EKLENDI', 0x00ff00)
+            .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+            .setDescription(`👤 **Üye:** ${member}\n🛡️ **Statü:** Guard Muafı`)
+            .setColor(0x00ff00)
+        ]
+      });
+    } catch (e) {
+      console.error('[WH_ADD_MODAL] Hata:', e);
+      await interaction.reply({ content: `❌ Hata: ${e.message}`, ephemeral: true }).catch(() => {});
+    }
+    return;
+  }
+
+  // WHITELIST REMOVE MODAL
+  if (modalCustomId.startsWith('wh_remove_modal_')) {
+    const authorId = modalCustomId.split('_')[3];
+    
+    // Sadece komutu kullanan kişi gönderebilir
+    if (interaction.user.id !== authorId) {
+      await interaction.reply({ content: '❌ Sadece bu komutu kullanan kişi gönderebilir.', ephemeral: true });
+      return;
+    }
+
+    try {
+      const userInput = interaction.fields.getTextInputValue('wh_user_id');
+      if (!userInput) {
+        await interaction.reply({ content: '❌ Kullanıcı ID veya @mention gerekli.', ephemeral: true });
+        return;
+      }
+
+      // Parse user
+      let userId = userInput.replace(/[<@!>]/g, '');
+      if (!/^\d{16,20}$/.test(userId)) {
+        await interaction.reply({ content: '❌ Geçerli bir @mention veya User ID girin.', ephemeral: true });
+        return;
+      }
+
+      if (!cfg.whitelistedUserIds) cfg.whitelistedUserIds = [];
+
+      const index = cfg.whitelistedUserIds.indexOf(userId);
+      if (index === -1) {
+        await interaction.reply({ content: '❌ Bu kullanıcı whitelist\'te değil.', ephemeral: true });
+        return;
+      }
+
+      cfg.whitelistedUserIds.splice(index, 1);
+      const fs = require('fs');
+      const path = require('path');
+      const configPath = path.join(__dirname, '..', 'config.json');
+      fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+
+      const member = await interaction.guild.members.fetch(userId).catch(() => null);
+      const userTag = member ? member.user.tag : userId;
+
+      await interaction.reply({
+        content: `✅ ${userTag} whitelist'ten çıkarıldı.`,
+        ephemeral: true,
+        embeds: [
+          baseEmbed('✅ WHITELIST\'TEN ÇIKARILDI', 0xff6b6b)
+            .setDescription(`👤 **Kullanıcı:** ${userTag} (\`${userId}\`)\n🛡️ **Statü:** Guard Koruması Aktif`)
+            .setColor(0xff6b6b)
+        ]
+      });
+    } catch (e) {
+      console.error('[WH_REMOVE_MODAL] Hata:', e);
+      await interaction.reply({ content: `❌ Hata: ${e.message}`, ephemeral: true }).catch(() => {});
+    }
+    return;
+  }
 });
 
 // Prefix komutlar
@@ -1204,6 +1326,126 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
       )
     ]
   });
+});
+
+// Modal Interactions (Whitelist)
+client.on('interactionCreate', async (interaction) => {
+  if (!isAllowedGuild(interaction.guild)) return;
+  if (!interaction.isModalSubmit()) return;
+
+  const customId = interaction.customId;
+  const { handleCommand } = require('./commands');
+
+  // Whitelist modals
+  if (customId.startsWith('wh_add_modal_')) {
+    const authorId = customId.split('_')[3];
+    if (interaction.user.id !== authorId) return await interaction.reply({ content: '❌ Bu işlemi siz yapmadınız.', ephemeral: true });
+
+    const userInput = interaction.fields.getTextInputValue('wh_user_id').trim();
+    const cfg = require('./../config.json');
+
+    try {
+      // Parse user (mention veya ID)
+      let targetId = null;
+      if (userInput.startsWith('<@')) {
+        const match = userInput.match(/\d+/);
+        if (match) targetId = match[0];
+      } else if (/^\d{16,20}$/.test(userInput)) {
+        targetId = userInput;
+      }
+
+      if (!targetId) {
+        return await interaction.reply({ content: '❌ Geçerli bir @mention veya User ID girin.', ephemeral: true });
+      }
+
+      const member = await interaction.guild.members.fetch(targetId).catch(() => null);
+      if (!member) {
+        return await interaction.reply({ content: '❌ Üye bulunamadı.', ephemeral: true });
+      }
+
+      const whitelistedUsers = cfg.whitelistedUserIds || [];
+      if (whitelistedUsers.includes(member.id)) {
+        return await interaction.reply({ content: `⚠️ ${member} zaten whitelist'te.`, ephemeral: true });
+      }
+
+      if (!cfg.whitelistedUserIds) cfg.whitelistedUserIds = [];
+      cfg.whitelistedUserIds.push(member.id);
+
+      const fs = require('fs');
+      const path = require('path');
+      const configPath = path.join(__dirname, '..', 'config.json');
+      fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+
+      await interaction.reply({
+        content: `✅ ${member} whitelist'e eklendi!`,
+        ephemeral: true
+      });
+
+      // Log
+      const { baseEmbed, sendToChannel, formatMessage } = require('./logger');
+      const logMsg = formatMessage('✅', 'Whitelist Eklendi', `Üye: ${member}\nYetkili: ${interaction.user}`);
+      await sendToChannel(client, cfg.logChannels?.general, logMsg).catch(() => {});
+    } catch (e) {
+      console.error('[WH_MODAL_ADD] Hata:', e);
+      await interaction.reply({ content: `❌ Hata: ${e.message}`, ephemeral: true }).catch(() => {});
+    }
+    return;
+  }
+
+  if (customId.startsWith('wh_remove_modal_')) {
+    const authorId = customId.split('_')[3];
+    if (interaction.user.id !== authorId) return await interaction.reply({ content: '❌ Bu işlemi siz yapmadınız.', ephemeral: true });
+
+    const userInput = interaction.fields.getTextInputValue('wh_user_id').trim();
+    const cfg = require('./../config.json');
+
+    try {
+      // Parse user (mention veya ID)
+      let targetId = null;
+      if (userInput.startsWith('<@')) {
+        const match = userInput.match(/\d+/);
+        if (match) targetId = match[0];
+      } else if (/^\d{16,20}$/.test(userInput)) {
+        targetId = userInput;
+      }
+
+      if (!targetId) {
+        return await interaction.reply({ content: '❌ Geçerli bir @mention veya User ID girin.', ephemeral: true });
+      }
+
+      const member = await interaction.guild.members.fetch(targetId).catch(() => null);
+      if (!member) {
+        return await interaction.reply({ content: '❌ Üye bulunamadı.', ephemeral: true });
+      }
+
+      const whitelistedUsers = cfg.whitelistedUserIds || [];
+      const index = whitelistedUsers.indexOf(member.id);
+      if (index === -1) {
+        return await interaction.reply({ content: `⚠️ ${member} whitelist'te değil.`, ephemeral: true });
+      }
+
+      cfg.whitelistedUserIds.splice(index, 1);
+
+      const fs = require('fs');
+      const path = require('path');
+      const configPath = path.join(__dirname, '..', 'config.json');
+      fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+
+      await interaction.reply({
+        content: `❌ ${member} whitelist'ten çıkarıldı!`,
+        ephemeral: true
+      });
+
+      // Log
+      const { baseEmbed, sendToChannel, formatMessage } = require('./logger');
+      const logMsg = formatMessage('❌', 'Whitelist Çıkarıldı', `Üye: ${member}\nYetkili: ${interaction.user}`);
+      await sendToChannel(client, cfg.logChannels?.general, logMsg).catch(() => {});
+    } catch (e) {
+      console.error('[WH_MODAL_REMOVE] Hata:', e);
+      await interaction.reply({ content: `❌ Hata: ${e.message}`, ephemeral: true }).catch(() => {});
+    }
+    return;
+  }
 });
 
 // Context Menu Interactions (Sağ Tık Koruması)
