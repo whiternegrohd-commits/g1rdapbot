@@ -2065,19 +2065,19 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
       }
     }
 
-    // Camera tracking
-    const wasCameraOn = !oldState.selfVideo;
-    const isCameraOn = !newState.selfVideo;
+    // Camera tracking (selfVideo: true = kamera AÇIK, false = KAPALI)
+    const wasCameraOn = oldState.selfVideo === true;
+    const isCameraOn = newState.selfVideo === true;
     
-    if (isCameraOn && wasCameraOn) {
-      // Camera açıldı
+    if (isCameraOn && !wasCameraOn) {
+      // Kamera açıldı
       voiceCameraSessions.set(userId, {
         channelId: newState.channelId,
         startTime: Date.now(),
         camera: true
       });
-    } else if (!isCameraOn && !wasCameraOn) {
-      // Camera kapandı
+    } else if (!isCameraOn && wasCameraOn) {
+      // Kamera kapandı
       const session = voiceCameraSessions.get(userId);
       if (session) {
         const seconds = Math.floor((Date.now() - session.startTime) / 1000);
