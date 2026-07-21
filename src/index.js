@@ -2034,8 +2034,6 @@ client.on('error', (e) => {
 });
 
 // Voice State Update - Streaming ve Camera Tracking
-const { startVoiceSession, endVoiceSession, addVoiceSeconds, addCameraSeconds, addStreamSeconds, isAFKChannel, cleanupSessions } = require('./database');
-
 const voiceSessions = new Map(); // userId -> { channelId, startTime }
 const cameraSessions = new Map(); // userId -> { channelId, startTime }
 const streamSessions = new Map(); // userId -> { channelId, startTime }
