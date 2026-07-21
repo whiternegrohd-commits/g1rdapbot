@@ -235,9 +235,9 @@ function getGuildLeaderboard(guildId, days = 5) {
     let totalStreaming = 0;
     let totalCamera = 0;
 
-    // Son X günü sor
-    for (const day of daysList) {
-      const bucket = userDays?.[day];
+    // Son X günü sor (VE TÜM GÜNLERI DE KONTROL ET)
+    for (const day of Object.keys(userDays)) {
+      const bucket = userDays[day];
       if (!bucket) continue;
 
       // Bu günün tüm kanallarından topla
