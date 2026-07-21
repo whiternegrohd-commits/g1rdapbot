@@ -2302,6 +2302,91 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
 
+  // Whitelist Komutları
+  if (cmd === 'wh-ekle' || cmd === 'whitelist-ekle') {
+    const superAdminRoleId = '1524180623852441610';
+    const ownerId = '588050048882049035';
+    const hasPermission = message.author.id === ownerId || message.member.roles.cache.has(superAdminRoleId);
+    if (!hasPermission) {
+      await message.reply('❌ Bu komutu sadece SuperAdmin rolü veya sunucu sahibi kullanabilir.');
+      return;
+    }
+    const user = parseUserFromMessage(message, args);
+    if (!user) {
+      await message.reply('Kullanım: `.wh-ekle @uye` veya `.wh-ekle <id>`');
+      return;
+    }
+    const member = await fetchMember(message.guild, user);
+    if (!member) return message.reply('Üye bulunamadı.');
+    const whitelistedUsers = cfg.whitelistedUserIds || [];
+    if (whitelistedUsers.includes(member.id)) {
+      await message.reply(`⚠️ ${member} zaten whitelist'te.`);
+      return;
+    }
+    if (!cfg.whitelistedUserIds) cfg.whitelistedUserIds = [];
+    cfg.whitelistedUserIds.push(member.id);
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, '..', 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+    await message.reply({
+      embeds: [baseEmbed('✅ WHITELIST\'E EKLENDI', 0x00ff00).setThumbnail(member.user.displayAvatarURL({ size: 256 })).setDescription(`👤 **Üye:** ${member}\n🛡️ **Statü:** Guard Muafı`).setColor(0x00ff00)]
+    });
+    return;
+  }
+
+  if (cmd === 'wh-çıkar' || cmd === 'whitelist-çıkar') {
+    const superAdminRoleId = '1524180623852441610';
+    const ownerId = '588050048882049035';
+    const hasPermission = message.author.id === ownerId || message.member.roles.cache.has(superAdminRoleId);
+    if (!hasPermission) {
+      await message.reply('❌ Bu komutu sadece SuperAdmin rolü veya sunucu sahibi kullanabilir.');
+      return;
+    }
+    const user = parseUserFromMessage(message, args);
+    if (!user) {
+      await message.reply('Kullanım: `.wh-çıkar @uye` veya `.wh-çıkar <id>`');
+      return;
+    }
+    const member = await fetchMember(message.guild, user);
+    if (!member) return message.reply('Üye bulunamadı.');
+    const whitelistedUsers = cfg.whitelistedUserIds || [];
+    const index = whitelistedUsers.indexOf(member.id);
+    if (index === -1) {
+      await message.reply(`⚠️ ${member} whitelist'te değil.`);
+      return;
+    }
+    cfg.whitelistedUserIds.splice(index, 1);
+    const fs = require('fs');
+    const path = require('path');
+    const configPath = path.join(__dirname, '..', 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
+    await message.reply({
+      embeds: [baseEmbed('❌ WHITELIST\'TEN ÇIKARILDI', 0xff0000).setThumbnail(member.user.displayAvatarURL({ size: 256 })).setDescription(`👤 **Üye:** ${member}`).setColor(0xff0000)]
+    });
+    return;
+  }
+
+  if (cmd === 'whitelist' || cmd === 'wh-list') {
+    const superAdminRoleId = '1524180623852441610';
+    const ownerId = '588050048882049035';
+    const hasPermission = message.author.id === ownerId || message.member.roles.cache.has(superAdminRoleId);
+    if (!hasPermission) {
+      await message.reply('❌ Bu komutu sadece SuperAdmin rolü veya sunucu sahibi kullanabilir.');
+      return;
+    }
+    const whitelistedUsers = cfg.whitelistedUserIds || [];
+    if (whitelistedUsers.length === 0) {
+      await message.reply('📭 Whitelist boş.');
+      return;
+    }
+    const userLines = whitelistedUsers.map(id => `• <@${id}> (\`${id}\`)`).join('\n');
+    await message.reply({
+      embeds: [baseEmbed('📋 WHITELIST LİSTESİ', 0x5865f2).setDescription(`**Toplam:** ${whitelistedUsers.length} kişi\n\n${userLines}`).setColor(0x5865f2)]
+    });
+    return;
+  }
+
   // Bilinmeyen komut - sessiz geç
   return;
 }
