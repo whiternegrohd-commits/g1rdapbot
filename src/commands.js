@@ -329,6 +329,14 @@ async function handleCommand({ client, message, cfg }) {
   if (cfg.guildId && String(message.guild.id) !== String(cfg.guildId)) return;
   if (message.author.bot) return;
 
+  // Message counting to database
+  try {
+    const { addMessageCountDB } = require('./database');
+    addMessageCountDB(message.guild.id, message.author.id, 1);
+  } catch (e) {
+    console.error('[MSG_COUNT] Hata:', e.message);
+  }
+
   const prefix = cfg.prefix ?? '.';
   if (!message.content.startsWith(prefix)) return;
 
@@ -513,9 +521,10 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
   if (cmd === 'stat') {
-    const days = 30;
+    const { getUserStats } = require('./database');
+    
+    let targetUserId = message.author.id;
     let targetUser = message.author;
-    let titleName = message.author.username;
 
     const parsed = parseUserFromMessage(message, args);
     if (parsed) {
@@ -525,182 +534,123 @@ async function handleCommand({ client, message, cfg }) {
         return;
       }
       targetUser = member.user;
-      titleName = member.user.username;
+      targetUserId = member.id;
     }
 
-    const { voice, messages, streaming, camera } = getUserSummary(message.guild.id, targetUser.id, days);
-
-    // Kanal sıralamalarını oluştur
-    const topVoice = Object.entries(voice)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-    
-    const topMessages = Object.entries(messages)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-    
-    const topStreaming = Object.entries(streaming)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-    
-    const topCamera = Object.entries(camera)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
+    const stats = getUserStats(message.guild.id, targetUserId, 30);
 
     // Format time
-    const fmtTime = (sec) => {
-      const s = Number(sec ?? 0);
-      const h = Math.floor(s / 3600);
-      const m = Math.floor((s % 3600) / 60);
-      const ss = Math.floor(s % 60);
-      if (h > 0) return `${h}s ${m}d`;
-      if (m > 0) return `${m}d ${ss}s`;
-      return `${ss}s`;
+    const formatTime = (seconds) => {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      
+      if (h > 0) return `${h}s ${m}d ${s}s`;
+      if (m > 0) return `${m}d ${s}s`;
+      return `${s}s`;
     };
 
-    // Embed build
-    let description = `📊 **${titleName}** - Son ${days} Gün\n\n`;
-
-    description += `🎧 **SES KANAL SIRALAMASI**\n`;
-    if (topVoice.length > 0) {
-      topVoice.forEach(([ch, sec], i) => {
-        description += `${i + 1}. <#${ch}> → ${fmtTime(sec)}\n`;
-      });
-    } else {
-      description += `*Veri bulunamadı*\n`;
-    }
-    description += '\n';
-
-    description += `💬 **MESAJ KANAL SIRALAMASI**\n`;
-    if (topMessages.length > 0) {
-      topMessages.forEach(([ch, count], i) => {
-        description += `${i + 1}. <#${ch}> → ${count} mesaj\n`;
-      });
-    } else {
-      description += `*Veri bulunamadı*\n`;
-    }
-    description += '\n';
-
-    description += `📺 **YAYIN KANAL SIRALAMASI**\n`;
-    if (topStreaming.length > 0) {
-      topStreaming.forEach(([ch, sec], i) => {
-        description += `${i + 1}. <#${ch}> → ${fmtTime(sec)}\n`;
-      });
-    } else {
-      description += `*Veri bulunamadı*\n`;
-    }
-    description += '\n';
-
-    description += `🎥 **KAMERA KANAL SIRALAMASI**\n`;
-    if (topCamera.length > 0) {
-      topCamera.forEach(([ch, sec], i) => {
-        description += `${i + 1}. <#${ch}> → ${fmtTime(sec)}\n`;
-      });
-    } else {
-      description += `*Veri bulunamadı*\n`;
-    }
+    const description = `
+💬 **Toplam Mesaj:** ${stats.totalMessages}
+🔊 **Toplam Ses Süresi:** ${formatTime(stats.totalVoice)}
+📷 **Toplam Kamera Süresi:** ${formatTime(stats.totalCamera)}
+📺 **Toplam Yayın/Ekran Paylaşımı:** ${formatTime(stats.totalStream)}
+    `.trim();
 
     const embed = baseEmbed('📊 İSTATİSTİKLER', 0x5865f2)
+      .setAuthor({ name: targetUser.username, iconURL: targetUser.displayAvatarURL({ size: 256 }) })
       .setDescription(description)
       .setColor(0x5865f2)
-      .setFooter({ text: `Komut: .stat • ${new Date().toLocaleString('tr-TR')}` });
+      .setThumbnail(targetUser.displayAvatarURL({ size: 256 }))
+      .setFooter({ text: `Son 30 Gün • ${new Date().toLocaleString('tr-TR')}` });
 
     await message.reply({ embeds: [embed] });
     return;
   }
   if (cmd === 'top' || cmd === 'leaderboard' || cmd === 'lb') {
     try {
-      const days = 30;
-      const { voiceByUser, msgByUser, streamingByUser, cameraByUser } = getGuildLeaderboard(message.guild.id, days);
-
-      const fmtTime = (sec) => {
-        const s = Math.max(0, Math.floor(Number(sec ?? 0)));
-        const h = Math.floor(s / 3600);
-        const m = Math.floor((s % 3600) / 60);
-        const ss = s % 60;
+      const { getLeaderboard } = require('./database');
+      
+      // Category determine
+      const categoryArg = (args[0] || 'genel').toLowerCase();
+      let category = 'genel';
+      let categoryEmoji = '🏆';
+      let categoryTitle = 'GENEL';
+      
+      if (['mesaj', 'msg', 'message'].includes(categoryArg)) {
+        category = 'mesaj';
+        categoryEmoji = '💬';
+        categoryTitle = 'MESAJ';
+      } else if (['ses', 'voice', 'v'].includes(categoryArg)) {
+        category = 'ses';
+        categoryEmoji = '🔊';
+        categoryTitle = 'SES';
+      } else if (['kamera', 'camera', 'cam'].includes(categoryArg)) {
+        category = 'kamera';
+        categoryEmoji = '📷';
+        categoryTitle = 'KAMERA';
+      } else if (['yayın', 'stream', 'broadcast'].includes(categoryArg)) {
+        category = 'yayın';
+        categoryEmoji = '📺';
+        categoryTitle = 'YAYIN';
+      }
+      
+      const rows = getLeaderboard(message.guild.id, category, 30);
+      
+      const formatTime = (seconds) => {
+        if (seconds === 0 || !seconds) return '0s';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        
         if (h > 0) return `${h}s ${m}d`;
-        if (m > 0) return `${m}d ${ss}s`;
-        return `${ss}s`;
+        if (m > 0) return `${m}d ${s}s`;
+        return `${s}s`;
       };
-
-      const getRankEmoji = (position) => {
-        if (position === 1) return '🥇';
-        if (position === 2) return '🥈';
-        if (position === 3) return '🥉';
-        return `#${position}`;
+      
+      const getRankEmoji = (pos) => {
+        if (pos === 1) return '🥇';
+        if (pos === 2) return '🥈';
+        if (pos === 3) return '🥉';
+        return `#${pos}`;
       };
-
-      const topVoice = Object.entries(voiceByUser)
-        .sort((a, b) => Number(b[1]) - Number(a[1]))
-        .slice(0, 10);
       
-      const topMsg = Object.entries(msgByUser)
-        .sort((a, b) => Number(b[1]) - Number(a[1]))
-        .slice(0, 10);
-      
-      const topStreaming = Object.entries(streamingByUser)
-        .sort((a, b) => Number(b[1]) - Number(a[1]))
-        .slice(0, 10);
-      
-      const topCamera = Object.entries(cameraByUser)
-        .sort((a, b) => Number(b[1]) - Number(a[1]))
-        .slice(0, 10);
-
-      // Embed oluştur
-      let description = `🏆 **LEADERBOARD** - Son ${days} Gün\n`;
+      let description = `${categoryEmoji} **${categoryTitle} LİDERLİĞİ** - Son 30 Gün\n`;
       description += `🏢 Sunucu: **${message.guild.name}**\n`;
-      description += `👥 Aktif Üyeler: **${new Set([...Object.keys(voiceByUser), ...Object.keys(msgByUser), ...Object.keys(streamingByUser), ...Object.keys(cameraByUser)]).size}**\n\n`;
-
-      description += `🎧 **EN ÇOK SES (Top 10)**\n`;
-      if (topVoice.length > 0) {
-        topVoice.forEach(([uid, sec], i) => {
-          description += `${getRankEmoji(i + 1)} <@${uid}> → ${fmtTime(sec)}\n`;
+      description += `👥 Aktif Üyeler: **${rows.length}**\n\n`;
+      
+      if (rows.length > 0) {
+        rows.forEach((row, i) => {
+          let value = '';
+          
+          if (category === 'genel') {
+            const total = (row.messages || 0) + (row.voice || 0) + (row.camera || 0) + (row.stream || 0);
+            value = `💬 ${row.messages || 0} | 🔊 ${formatTime(row.voice || 0)} | 📷 ${formatTime(row.camera || 0)} | 📺 ${formatTime(row.stream || 0)}`;
+          } else if (category === 'mesaj') {
+            value = `${row.messages || 0} mesaj`;
+          } else if (category === 'ses') {
+            value = formatTime(row.voice || 0);
+          } else if (category === 'kamera') {
+            value = formatTime(row.camera || 0);
+          } else if (category === 'yayın') {
+            value = formatTime(row.stream || 0);
+          }
+          
+          description += `${getRankEmoji(i + 1)} <@${row.user_id}> • ${value}\n`;
         });
       } else {
-        description += `*Veri bulunamadı*\n`;
+        description += '*Henüz veri bulunamadı*\n';
       }
-      description += '\n';
-
-      description += `💬 **EN ÇOK MESAJ (Top 10)**\n`;
-      if (topMsg.length > 0) {
-        topMsg.forEach(([uid, count], i) => {
-          description += `${getRankEmoji(i + 1)} <@${uid}> → ${count} mesaj\n`;
-        });
-      } else {
-        description += `*Veri bulunamadı*\n`;
-      }
-      description += '\n';
-
-      description += `📺 **EN ÇOK YAYIN (Top 10)**\n`;
-      if (topStreaming.length > 0) {
-        topStreaming.forEach(([uid, sec], i) => {
-          description += `${getRankEmoji(i + 1)} <@${uid}> → ${fmtTime(sec)}\n`;
-        });
-      } else {
-        description += `*Veri bulunamadı*\n`;
-      }
-      description += '\n';
-
-      description += `🎥 **EN ÇOK KAMERA (Top 10)**\n`;
-      if (topCamera.length > 0) {
-        topCamera.forEach(([uid, sec], i) => {
-          description += `${getRankEmoji(i + 1)} <@${uid}> → ${fmtTime(sec)}\n`;
-        });
-      } else {
-        description += `*Veri bulunamadı*\n`;
-      }
-
-      const embed = baseEmbed('🏆 LEADERBOARD', 0x00b0f4)
+      
+      const embed = baseEmbed(`${categoryEmoji} LEADERBOARD`, 0x5865f2)
         .setDescription(description)
-        .setColor(0x00b0f4)
-        .setFooter({ text: `Komut: .leaderboard • ${new Date().toLocaleString('tr-TR')}` });
-
-      const reply = await message.reply({ embeds: [embed] });
-      if (cfg.emojis?.success) await reply.react(cfg.emojis.success).catch(() => {});
+        .setColor(0x5865f2)
+        .setFooter({ text: `Kategoriler: .lb genel | .lb mesaj | .lb ses | .lb kamera | .lb yayın • ${new Date().toLocaleString('tr-TR')}` });
+      
+      await message.reply({ embeds: [embed] });
     } catch (e) {
-      console.error('[LEADERBOARD] Hata:', e.message, e.stack);
-      const reply = await message.reply({ content: `❌ Leaderboard hesaplanırken hata oldu: ${e.message}` });
-      if (cfg.emojis?.error) await reply.react(cfg.emojis.error).catch(() => {});
+      console.error('[LEADERBOARD] Hata:', e.message);
+      await message.reply({ content: `❌ Leaderboard hesaplanırken hata oldu: ${e.message}` });
     }
     return;
   }

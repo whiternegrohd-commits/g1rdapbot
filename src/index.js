@@ -20,6 +20,7 @@ const cfg = JSON.parse(
 
 const { handleCommand, isAdmin } = require('./commands');
 const { safeTruncate, baseEmbed, sendToChannel, sendDM, formatMessage } = require('./logger');
+const { addMessageCount: addMessageCountDB, cleanupSessions } = require('./database');
 const {
   handleGuardEvent,
   notifyChannelChangeDM,
@@ -104,6 +105,10 @@ async function findRoleUpdateExecutor(member) {
 
 client.on('ready', async () => {
   console.log(`✅ Bot giriş yaptı: ${client.user.tag}`);
+  
+  // Cleanup stale voice sessions
+  cleanupSessions();
+  console.log('🧹 Stale voice sessions temizlendi');
   
   // Bot internal log
   logBotInternal({
@@ -442,9 +447,6 @@ async function syncTagRole(member) {
     await member.roles.remove(tagCfg.roleId, 'Sunucu tagı kaldırıldı').catch(() => {});
   }
 }
-
-// Voice oturum takibi (guildId:userId -> { channelId, startMs })
-const voiceSessions = new Map();
 
 // Spam tracking (userId -> { messages, links, emojis, warnings, lastCheck })
 const spamTracker = new Map();
@@ -2032,59 +2034,67 @@ client.on('error', (e) => {
 });
 
 // Voice State Update - Streaming ve Camera Tracking
-const voiceStreamingSessions = new Map(); // userId -> { channelId, startTime, streaming }
-const voiceCameraSessions = new Map(); // userId -> { channelId, startTime, camera }
+const { startVoiceSession, endVoiceSession, addVoiceSeconds, addCameraSeconds, addStreamSeconds, isAFKChannel, cleanupSessions } = require('./database');
+
+const voiceSessions = new Map(); // userId -> { channelId, startTime }
+const cameraSessions = new Map(); // userId -> { channelId, startTime }
+const streamSessions = new Map(); // userId -> { channelId, startTime }
 
 client.on('voiceStateUpdate', async (oldState, newState) => {
   if (!isAllowedGuild(newState.guild)) return;
   
   try {
-    const { addStreamingSeconds, addCameraSeconds, dayKeyLocal } = require('./storage');
     const userId = newState.member?.id;
+    const guildId = newState.guild.id;
+    
     if (!userId || newState.member?.user?.bot) return;
+
+    // Voice channel change
+    if (oldState.channelId !== newState.channelId) {
+      // Left voice
+      if (oldState.channelId && !isAFKChannel(guildId, oldState.channelId)) {
+        const duration = endVoiceSession(guildId, userId, 'voice');
+        if (duration > 0) {
+          addVoiceSeconds(guildId, userId, duration);
+        }
+        voiceSessions.delete(userId);
+      }
+      
+      // Joined voice
+      if (newState.channelId && !isAFKChannel(guildId, newState.channelId)) {
+        startVoiceSession(guildId, userId, newState.channelId, 'voice');
+        voiceSessions.set(userId, { channelId: newState.channelId, startTime: Date.now() });
+      }
+    }
 
     // Streaming tracking
     const wasStreaming = oldState.streaming;
     const isStreaming = newState.streaming;
     
-    if (isStreaming && !wasStreaming) {
-      // Streaming başladı
-      voiceStreamingSessions.set(userId, {
-        channelId: newState.channelId,
-        startTime: Date.now(),
-        streaming: true
-      });
+    if (isStreaming && !wasStreaming && newState.channelId && !isAFKChannel(guildId, newState.channelId)) {
+      startVoiceSession(guildId, userId, newState.channelId, 'stream');
+      streamSessions.set(userId, { channelId: newState.channelId, startTime: Date.now() });
     } else if (!isStreaming && wasStreaming) {
-      // Streaming bitti
-      const session = voiceStreamingSessions.get(userId);
-      if (session) {
-        const seconds = Math.floor((Date.now() - session.startTime) / 1000);
-        const dayKey = dayKeyLocal();
-        addStreamingSeconds(newState.guild.id, userId, session.channelId, dayKey, seconds);
-        voiceStreamingSessions.delete(userId);
+      const duration = endVoiceSession(guildId, userId, 'stream');
+      if (duration > 0) {
+        addStreamSeconds(guildId, userId, duration);
       }
+      streamSessions.delete(userId);
     }
 
-    // Camera tracking (selfVideo: true = kamera AÇIK, false = KAPALI)
+    // Camera tracking (selfVideo: true = camera AÇIK)
     const wasCameraOn = oldState.selfVideo === true;
     const isCameraOn = newState.selfVideo === true;
     
-    if (isCameraOn && !wasCameraOn) {
-      // Kamera açıldı
-      voiceCameraSessions.set(userId, {
-        channelId: newState.channelId,
-        startTime: Date.now(),
-        camera: true
-      });
+    if (isCameraOn && !wasCameraOn && newState.channelId && !isAFKChannel(guildId, newState.channelId)) {
+      startVoiceSession(guildId, userId, newState.channelId, 'camera');
+      cameraSessions.set(userId, { channelId: newState.channelId, startTime: Date.now() });
     } else if (!isCameraOn && wasCameraOn) {
-      // Kamera kapandı
-      const session = voiceCameraSessions.get(userId);
-      if (session) {
-        const seconds = Math.floor((Date.now() - session.startTime) / 1000);
-        const dayKey = dayKeyLocal();
-        addCameraSeconds(newState.guild.id, userId, session.channelId, dayKey, seconds);
-        voiceCameraSessions.delete(userId);
+      const duration = endVoiceSession(guildId, userId, 'camera');
+      if (duration > 0) {
+        addCameraSeconds(guildId, userId, duration);
       }
+      cameraSessions.delete(userId);
     }
   } catch (e) {
     console.error('[VOICE_UPDATE] Hata:', e.message);
