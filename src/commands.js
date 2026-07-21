@@ -514,100 +514,106 @@ async function handleCommand({ client, message, cfg }) {
   }
   if (cmd === 'stat') {
     const days = 30;
-    const parsed = parseUserFromMessage(message, args);
     let targetUser = message.author;
-    let mentionLine = `${message.author} (\`${message.author.id}\`)`;
-    let thumbUrl = message.author.displayAvatarURL({ size: 256 });
     let titleName = message.author.username;
 
+    const parsed = parseUserFromMessage(message, args);
     if (parsed) {
       const member = await fetchMember(message.guild, parsed);
       if (!member) {
-        await message.reply('Üye bulunamadı.');
+        await message.reply('❌ Üye bulunamadı.');
         return;
       }
       targetUser = member.user;
-      mentionLine = `${member} (\`${member.id}\`)`;
-      thumbUrl = member.displayAvatarURL({ size: 256 });
       titleName = member.user.username;
     }
 
-    const { voice, messages } = getUserSummary(message.guild.id, targetUser.id, days);
-    const { daysList, dailyVoice, dailyMessages } = getUserDailyStats(message.guild.id, targetUser.id, 7);
+    const { voice, messages, streaming, camera } = getUserSummary(message.guild.id, targetUser.id, days);
 
+    // Kanal sıralamalarını oluştur
     const topVoice = Object.entries(voice)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 10);
-    const topMsg = Object.entries(messages)
+      .slice(0, 5);
+    
+    const topMessages = Object.entries(messages)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 10);
+      .slice(0, 5);
+    
+    const topStreaming = Object.entries(streaming)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+    
+    const topCamera = Object.entries(camera)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
 
-    const fmtDur = (sec) => {
+    // Format time
+    const fmtTime = (sec) => {
       const s = Number(sec ?? 0);
       const h = Math.floor(s / 3600);
       const m = Math.floor((s % 3600) / 60);
       const ss = Math.floor(s % 60);
-      const parts = [];
-      if (h) parts.push(`${h}s`);
-      if (m) parts.push(`${m}d`);
-      parts.push(`${ss}s`);
-      return parts.join(' ');
+      if (h > 0) return `${h}s ${m}d`;
+      if (m > 0) return `${m}d ${ss}s`;
+      return `${ss}s`;
     };
 
-    const totalVoice = topVoice.reduce((acc, [, sec]) => acc + Number(sec ?? 0), 0);
-    const totalMsg = topMsg.reduce((acc, [, c]) => acc + Number(c ?? 0), 0);
+    // Embed build
+    let description = `📊 **${titleName}** - Son ${days} Gün\n\n`;
 
-    const voiceLines = topVoice.length
-      ? topVoice.map(([ch, sec]) => `• <#${ch}> : **${fmtDur(sec)}**`).join('\n')
-      : 'Veri bulunamadı.';
-    const msgLines = topMsg.length
-      ? topMsg.map(([ch, c]) => `• <#${ch}> : **${c}** mesaj`).join('\n')
-      : 'Veri bulunamadı.';
+    description += `🎧 **SES KANAL SIRALAMASI**\n`;
+    if (topVoice.length > 0) {
+      topVoice.forEach(([ch, sec], i) => {
+        description += `${i + 1}. <#${ch}> → ${fmtTime(sec)}\n`;
+      });
+    } else {
+      description += `*Veri bulunamadı*\n`;
+    }
+    description += '\n';
 
-    await message.reply({
-      embeds: [
-        baseEmbed(`📊 ${titleName} adlı kullanıcının ${days} günlük istatistikleri`, 0x5865f2)
-          .setThumbnail(thumbUrl)
-          .setDescription(
-            `👤 Kullanıcı: ${mentionLine}\n` +
-            `📅 Tarih: ${new Date().toLocaleDateString('tr-TR')}\n` +
-            `⏱️ Süre: Son ${days} gün`
-          )
-          .addFields(
-            {
-              name: `🎧 Ses Kanal Sıralaması (${fmtDur(totalVoice)})`,
-              value: safeTruncate(voiceLines, 1024),
-              inline: false
-            },
-            {
-              name: `💬 Mesaj Kanal Sıralaması (${totalMsg} mesaj)`,
-              value: safeTruncate(msgLines, 1024),
-              inline: false
-            }
-          )
-      ]
-    });
+    description += `💬 **MESAJ KANAL SIRALAMASI**\n`;
+    if (topMessages.length > 0) {
+      topMessages.forEach(([ch, count], i) => {
+        description += `${i + 1}. <#${ch}> → ${count} mesaj\n`;
+      });
+    } else {
+      description += `*Veri bulunamadı*\n`;
+    }
+    description += '\n';
+
+    description += `📺 **YAYIN KANAL SIRALAMASI**\n`;
+    if (topStreaming.length > 0) {
+      topStreaming.forEach(([ch, sec], i) => {
+        description += `${i + 1}. <#${ch}> → ${fmtTime(sec)}\n`;
+      });
+    } else {
+      description += `*Veri bulunamadı*\n`;
+    }
+    description += '\n';
+
+    description += `🎥 **KAMERA KANAL SIRALAMASI**\n`;
+    if (topCamera.length > 0) {
+      topCamera.forEach(([ch, sec], i) => {
+        description += `${i + 1}. <#${ch}> → ${fmtTime(sec)}\n`;
+      });
+    } else {
+      description += `*Veri bulunamadı*\n`;
+    }
+
+    const embed = baseEmbed('📊 İSTATİSTİKLER', 0x5865f2)
+      .setDescription(description)
+      .setColor(0x5865f2)
+      .setFooter({ text: `Komut: .stat • ${new Date().toLocaleString('tr-TR')}` });
+
+    await message.reply({ embeds: [embed] });
     return;
   }
   if (cmd === 'top' || cmd === 'leaderboard' || cmd === 'lb') {
     try {
-      // Select menu ile time frame seçimi
-      const timeSelectMenu = new StringSelectMenuBuilder()
-        .setCustomId('leaderboard_time_select')
-        .setPlaceholder('⏱️ Dönem seçin')
-        .addOptions(
-          { label: 'Son 7 Gün', value: '7', emoji: '📅' },
-          { label: 'Son 30 Gün', value: '30', emoji: '📊' },
-          { label: 'Son 90 Gün', value: '90', emoji: '📈' }
-        );
-
-      const timeRow = new ActionRowBuilder().addComponents(timeSelectMenu);
-
-      // İlk olarak 30 günlük göster
       const days = 30;
-      const { voiceByUser, msgByUser } = getGuildLeaderboard(message.guild.id, days);
+      const { voiceByUser, msgByUser, streamingByUser, cameraByUser } = getGuildLeaderboard(message.guild.id, days);
 
-      const fmtDur = (sec) => {
+      const fmtTime = (sec) => {
         const s = Math.max(0, Math.floor(Number(sec ?? 0)));
         const h = Math.floor(s / 3600);
         const m = Math.floor((s % 3600) / 60);
@@ -624,121 +630,72 @@ async function handleCommand({ client, message, cfg }) {
         return `#${position}`;
       };
 
-      const topVoiceUsers = Object.entries(voiceByUser)
+      const topVoice = Object.entries(voiceByUser)
         .sort((a, b) => Number(b[1]) - Number(a[1]))
         .slice(0, 10);
-        
-      const topMsgUsers = Object.entries(msgByUser)
+      
+      const topMsg = Object.entries(msgByUser)
+        .sort((a, b) => Number(b[1]) - Number(a[1]))
+        .slice(0, 10);
+      
+      const topStreaming = Object.entries(streamingByUser)
+        .sort((a, b) => Number(b[1]) - Number(a[1]))
+        .slice(0, 10);
+      
+      const topCamera = Object.entries(cameraByUser)
         .sort((a, b) => Number(b[1]) - Number(a[1]))
         .slice(0, 10);
 
-      // Grafik için veri hazırla (ilk 5)
-      const voiceLabels = topVoiceUsers.slice(0, 5).map(([uid]) => `<@${uid}>`);
-      const voiceData = topVoiceUsers.slice(0, 5).map(([, sec]) => Math.floor(Number(sec ?? 0) / 3600));
-      
-      const msgLabels = topMsgUsers.slice(0, 5).map(([uid]) => `<@${uid}>`);
-      const msgData = topMsgUsers.slice(0, 5).map(([, c]) => Number(c ?? 0));
+      // Embed oluştur
+      let description = `🏆 **LEADERBOARD** - Son ${days} Gün\n`;
+      description += `🏢 Sunucu: **${message.guild.name}**\n`;
+      description += `👥 Aktif Üyeler: **${new Set([...Object.keys(voiceByUser), ...Object.keys(msgByUser), ...Object.keys(streamingByUser), ...Object.keys(cameraByUser)]).size}**\n\n`;
 
-      // Quickchart URL'leri
-      const voiceChartConfig = {
-        type: 'bar',
-        data: {
-          labels: voiceLabels,
-          datasets: [{
-            label: 'Ses Saati',
-            data: voiceData,
-            backgroundColor: ['#5865F2', '#5865F2', '#5865F2', '#5865F2', '#5865F2'],
-            borderColor: '#5865F2',
-            borderWidth: 2
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { display: false },
-            title: { display: true, text: '🎧 Top 5 Ses Süresi' }
-          },
-          scales: { y: { beginAtZero: true } }
-        }
-      };
+      description += `🎧 **EN ÇOK SES (Top 10)**\n`;
+      if (topVoice.length > 0) {
+        topVoice.forEach(([uid, sec], i) => {
+          description += `${getRankEmoji(i + 1)} <@${uid}> → ${fmtTime(sec)}\n`;
+        });
+      } else {
+        description += `*Veri bulunamadı*\n`;
+      }
+      description += '\n';
 
-      const msgChartConfig = {
-        type: 'bar',
-        data: {
-          labels: msgLabels,
-          datasets: [{
-            label: 'Mesaj Sayısı',
-            data: msgData,
-            backgroundColor: ['#57F287', '#57F287', '#57F287', '#57F287', '#57F287'],
-            borderColor: '#57F287',
-            borderWidth: 2
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { display: false },
-            title: { display: true, text: '💬 Top 5 Mesaj' }
-          },
-          scales: { y: { beginAtZero: true } }
-        }
-      };
+      description += `💬 **EN ÇOK MESAJ (Top 10)**\n`;
+      if (topMsg.length > 0) {
+        topMsg.forEach(([uid, count], i) => {
+          description += `${getRankEmoji(i + 1)} <@${uid}> → ${count} mesaj\n`;
+        });
+      } else {
+        description += `*Veri bulunamadı*\n`;
+      }
+      description += '\n';
 
-      const voiceChartUrl = `https://quickchart.io/chart?bkg=white&c=${encodeURIComponent(JSON.stringify(voiceChartConfig))}`;
-      const msgChartUrl = `https://quickchart.io/chart?bkg=white&c=${encodeURIComponent(JSON.stringify(msgChartConfig))}`;
+      description += `📺 **EN ÇOK YAYIN (Top 10)**\n`;
+      if (topStreaming.length > 0) {
+        topStreaming.forEach(([uid, sec], i) => {
+          description += `${getRankEmoji(i + 1)} <@${uid}> → ${fmtTime(sec)}\n`;
+        });
+      } else {
+        description += `*Veri bulunamadı*\n`;
+      }
+      description += '\n';
 
-      const voiceLines = topVoiceUsers.length > 0
-        ? topVoiceUsers.map(([uid, sec], i) => `${getRankEmoji(i + 1)} <@${uid}> — **${fmtDur(sec)}**`).join('\n')
-        : '📭 Veri yok';
-        
-      const msgLines = topMsgUsers.length > 0
-        ? topMsgUsers.map(([uid, c], i) => `${getRankEmoji(i + 1)} <@${uid}> — **${c}** 💬`).join('\n')
-        : '📭 Veri yok';
+      description += `🎥 **EN ÇOK KAMERA (Top 10)**\n`;
+      if (topCamera.length > 0) {
+        topCamera.forEach(([uid, sec], i) => {
+          description += `${getRankEmoji(i + 1)} <@${uid}> → ${fmtTime(sec)}\n`;
+        });
+      } else {
+        description += `*Veri bulunamadı*\n`;
+      }
 
-      const totalVoiceSum = Object.values(voiceByUser).reduce((a, b) => a + Number(b ?? 0), 0);
-      const totalMsgSum = Object.values(msgByUser).reduce((a, b) => a + Number(b ?? 0), 0);
-      const totalVoiceHours = Math.floor(totalVoiceSum / 3600);
+      const embed = baseEmbed('🏆 LEADERBOARD', 0x00b0f4)
+        .setDescription(description)
+        .setColor(0x00b0f4)
+        .setFooter({ text: `Komut: .leaderboard • ${new Date().toLocaleString('tr-TR')}` });
 
-      const reply = await message.reply({
-        embeds: [
-          baseEmbed(`🏆 GIRDAP LEADERBOARD - Son ${days} Gün`, 0x00b0f4)
-            .setDescription(
-              `🏢 **Sunucu:** ${message.guild.name}\n` +
-              `👥 **Aktif Üyeler:** ${Object.keys({...voiceByUser, ...msgByUser}).length}\n\n` +
-              `📊 **İstatistikler:**\n` +
-              `🎧 Toplam Ses: **${totalVoiceHours}s** (${(totalVoiceSum / 60).toFixed(0)}d)\n` +
-              `💬 Toplam Mesaj: **${totalMsgSum}** mesaj`
-            )
-            .setImage(voiceChartUrl)
-            .addFields(
-              { 
-                name: '🎧 En Çok Ses Süresi (Top 10)', 
-                value: safeTruncate(voiceLines, 1024) || '📭 Veri yok', 
-                inline: false 
-              }
-            )
-            .setColor(0x00b0f4)
-            .setFooter({ text: `✨ Güncelleme: ${new Date().toLocaleDateString('tr-TR')} ${new Date().toLocaleTimeString('tr-TR')}` })
-        ],
-        components: [timeRow]
-      });
-
-      // İkinci embed mesaj süresi grafiği ile
-      await message.channel.send({
-        embeds: [
-          baseEmbed(`💬 MESAJ SIRALAMASI`, 0x57f287)
-            .setImage(msgChartUrl)
-            .addFields(
-              { 
-                name: '💬 En Çok Mesaj (Top 10)', 
-                value: safeTruncate(msgLines, 1024) || '📭 Veri yok', 
-                inline: false 
-              }
-            )
-            .setColor(0x57f287)
-        ]
-      });
-      
+      const reply = await message.reply({ embeds: [embed] });
       if (cfg.emojis?.success) await reply.react(cfg.emojis.success).catch(() => {});
     } catch (e) {
       console.error('[LEADERBOARD] Hata:', e.message, e.stack);

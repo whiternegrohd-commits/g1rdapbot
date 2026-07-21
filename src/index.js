@@ -2031,6 +2031,66 @@ client.on('error', (e) => {
   });
 });
 
+// Voice State Update - Streaming ve Camera Tracking
+const voiceStreamingSessions = new Map(); // userId -> { channelId, startTime, streaming }
+const voiceCameraSessions = new Map(); // userId -> { channelId, startTime, camera }
+
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  if (!isAllowedGuild(newState.guild)) return;
+  
+  try {
+    const { addStreamingSeconds, addCameraSeconds, dayKeyLocal } = require('./storage');
+    const userId = newState.member?.id;
+    if (!userId || newState.member?.user?.bot) return;
+
+    // Streaming tracking
+    const wasStreaming = oldState.streaming;
+    const isStreaming = newState.streaming;
+    
+    if (isStreaming && !wasStreaming) {
+      // Streaming başladı
+      voiceStreamingSessions.set(userId, {
+        channelId: newState.channelId,
+        startTime: Date.now(),
+        streaming: true
+      });
+    } else if (!isStreaming && wasStreaming) {
+      // Streaming bitti
+      const session = voiceStreamingSessions.get(userId);
+      if (session) {
+        const seconds = Math.floor((Date.now() - session.startTime) / 1000);
+        const dayKey = dayKeyLocal();
+        addStreamingSeconds(newState.guild.id, userId, session.channelId, dayKey, seconds);
+        voiceStreamingSessions.delete(userId);
+      }
+    }
+
+    // Camera tracking
+    const wasCameraOn = !oldState.selfVideo;
+    const isCameraOn = !newState.selfVideo;
+    
+    if (isCameraOn && wasCameraOn) {
+      // Camera açıldı
+      voiceCameraSessions.set(userId, {
+        channelId: newState.channelId,
+        startTime: Date.now(),
+        camera: true
+      });
+    } else if (!isCameraOn && !wasCameraOn) {
+      // Camera kapandı
+      const session = voiceCameraSessions.get(userId);
+      if (session) {
+        const seconds = Math.floor((Date.now() - session.startTime) / 1000);
+        const dayKey = dayKeyLocal();
+        addCameraSeconds(newState.guild.id, userId, session.channelId, dayKey, seconds);
+        voiceCameraSessions.delete(userId);
+      }
+    }
+  } catch (e) {
+    console.error('[VOICE_UPDATE] Hata:', e.message);
+  }
+});
+
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ DISCORD_TOKEN yok. .env dosyasını oluşturup token gir.');
   process.exit(1);

@@ -75,9 +75,11 @@ function dayKeyLocal(d = new Date()) {
 function ensureUserDay(db, guildId, userId, dayKey) {
   if (!db[guildId]) db[guildId] = {};
   if (!db[guildId][userId]) db[guildId][userId] = {};
-  if (!db[guildId][userId][dayKey]) db[guildId][userId][dayKey] = { voice: {}, messages: {} };
+  if (!db[guildId][userId][dayKey]) db[guildId][userId][dayKey] = { voice: {}, messages: {}, streaming: {}, camera: {} };
   if (!db[guildId][userId][dayKey].voice) db[guildId][userId][dayKey].voice = {};
   if (!db[guildId][userId][dayKey].messages) db[guildId][userId][dayKey].messages = {};
+  if (!db[guildId][userId][dayKey].streaming) db[guildId][userId][dayKey].streaming = {};
+  if (!db[guildId][userId][dayKey].camera) db[guildId][userId][dayKey].camera = {};
   return db[guildId][userId][dayKey];
 }
 
@@ -99,6 +101,32 @@ function addVoiceSecondsDirect(guildId, userId, channelId, dayKey, seconds) {
     writeJson(ACTIVITY_PATH, db);
   } catch (e) {
     console.error(`[VOICE] Yazma hatası ${guildId}/${userId}:`, e.message);
+  }
+}
+
+function addStreamingSeconds(guildId, userId, channelId, dayKey, seconds) {
+  if (!seconds || seconds < 1) return;
+  try {
+    const db = readJson(ACTIVITY_PATH);
+    const bucket = ensureUserDay(db, guildId, userId, dayKey);
+    const current = Number(bucket.streaming[channelId] ?? 0);
+    bucket.streaming[channelId] = current + Number(seconds);
+    writeJson(ACTIVITY_PATH, db);
+  } catch (e) {
+    console.error(`[STREAMING] Yazma hatası ${guildId}/${userId}:`, e.message);
+  }
+}
+
+function addCameraSeconds(guildId, userId, channelId, dayKey, seconds) {
+  if (!seconds || seconds < 1) return;
+  try {
+    const db = readJson(ACTIVITY_PATH);
+    const bucket = ensureUserDay(db, guildId, userId, dayKey);
+    const current = Number(bucket.camera[channelId] ?? 0);
+    bucket.camera[channelId] = current + Number(seconds);
+    writeJson(ACTIVITY_PATH, db);
+  } catch (e) {
+    console.error(`[CAMERA] Yazma hatası ${guildId}/${userId}:`, e.message);
   }
 }
 
@@ -148,6 +176,8 @@ function getUserSummary(guildId, userId, days = 5) {
 
   const voice = {};
   const messages = {};
+  const streaming = {};
+  const camera = {};
 
   for (const day of daysList) {
     const bucket = userDb[day];
@@ -158,9 +188,15 @@ function getUserSummary(guildId, userId, days = 5) {
     for (const [ch, c] of Object.entries(bucket.messages ?? {})) {
       messages[ch] = Number(messages[ch] ?? 0) + Number(c ?? 0);
     }
+    for (const [ch, sec] of Object.entries(bucket.streaming ?? {})) {
+      streaming[ch] = Number(streaming[ch] ?? 0) + Number(sec ?? 0);
+    }
+    for (const [ch, sec] of Object.entries(bucket.camera ?? {})) {
+      camera[ch] = Number(camera[ch] ?? 0) + Number(sec ?? 0);
+    }
   }
 
-  return { daysList, voice, messages };
+  return { daysList, voice, messages, streaming, camera };
 }
 
 function getUserDailyStats(guildId, userId, days = 7) {
@@ -189,30 +225,40 @@ function getGuildLeaderboard(guildId, days = 5) {
 
   const voiceByUser = {}; // userId -> seconds (toplam)
   const msgByUser = {}; // userId -> count (toplam)
+  const streamingByUser = {}; // userId -> seconds
+  const cameraByUser = {}; // userId -> seconds
 
   // Her kullanıcı için
   for (const [userId, userDays] of Object.entries(guildDb)) {
     let totalVoice = 0;
     let totalMsg = 0;
+    let totalStreaming = 0;
+    let totalCamera = 0;
 
     // Son X günü sor
     for (const day of daysList) {
       const bucket = userDays?.[day];
       if (!bucket) continue;
 
-      // Bu günün tüm kanallarından ses topla
+      // Bu günün tüm kanallarından topla
       const voiceTotal = Object.values(bucket.voice ?? {}).reduce((a, b) => a + Number(b ?? 0), 0);
       const msgTotal = Object.values(bucket.messages ?? {}).reduce((a, b) => a + Number(b ?? 0), 0);
+      const streamingTotal = Object.values(bucket.streaming ?? {}).reduce((a, b) => a + Number(b ?? 0), 0);
+      const cameraTotal = Object.values(bucket.camera ?? {}).reduce((a, b) => a + Number(b ?? 0), 0);
 
       totalVoice += voiceTotal;
       totalMsg += msgTotal;
+      totalStreaming += streamingTotal;
+      totalCamera += cameraTotal;
     }
 
     if (totalVoice > 0) voiceByUser[userId] = totalVoice;
     if (totalMsg > 0) msgByUser[userId] = totalMsg;
+    if (totalStreaming > 0) streamingByUser[userId] = totalStreaming;
+    if (totalCamera > 0) cameraByUser[userId] = totalCamera;
   }
 
-  return { daysList, voiceByUser, msgByUser };
+  return { daysList, voiceByUser, msgByUser, streamingByUser, cameraByUser };
 }
 
 function setJail(guildId, userId, jailData) {
@@ -261,6 +307,8 @@ module.exports = {
   dayKeyLocal,
   addMessageCount,
   addVoiceDurationSplit,
+  addStreamingSeconds,
+  addCameraSeconds,
   getUserSummary,
   getUserDailyStats,
   getGuildLeaderboard,
