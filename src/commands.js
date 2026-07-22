@@ -513,50 +513,79 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
   if (cmd === 'stat') {
-    const { getUserStats } = require('./database');
-    
-    let targetUserId = message.author.id;
-    let targetUser = message.author;
-
-    const parsed = parseUserFromMessage(message, args);
-    if (parsed) {
-      const member = await fetchMember(message.guild, parsed);
-      if (!member) {
-        await message.reply('❌ Üye bulunamadı.');
-        return;
-      }
-      targetUser = member.user;
-      targetUserId = member.id;
-    }
-
-    const stats = getUserStats(message.guild.id, targetUserId, 30);
-
-    // Format time
-    const formatTime = (seconds) => {
-      const h = Math.floor(seconds / 3600);
-      const m = Math.floor((seconds % 3600) / 60);
-      const s = seconds % 60;
+    try {
+      const { getUserStats } = require('./database');
       
-      if (h > 0) return `${h}s ${m}d ${s}s`;
-      if (m > 0) return `${m}d ${s}s`;
-      return `${s}s`;
-    };
+      let targetUserId = message.author.id;
+      let targetUser = message.author;
 
-    const description = `
-💬 **Toplam Mesaj:** ${stats.totalMessages}
-🔊 **Toplam Ses Süresi:** ${formatTime(stats.totalVoice)}
-📷 **Toplam Kamera Süresi:** ${formatTime(stats.totalCamera)}
-📺 **Toplam Yayın/Ekran Paylaşımı:** ${formatTime(stats.totalStream)}
-    `.trim();
+      const parsed = parseUserFromMessage(message, args);
+      if (parsed) {
+        const member = await fetchMember(message.guild, parsed);
+        if (!member) {
+          const errEmbed = baseEmbed('❌ HATA', 0xff0000)
+            .setDescription('Üye bulunamadı.')
+            .setColor(0xff0000);
+          await message.reply({ embeds: [errEmbed], ephemeral: true });
+          return;
+        }
+        targetUser = member.user;
+        targetUserId = member.id;
+      }
 
-    const embed = baseEmbed('📊 İSTATİSTİKLER', 0x5865f2)
-      .setAuthor({ name: targetUser.username, iconURL: targetUser.displayAvatarURL({ size: 256 }) })
-      .setDescription(description)
-      .setColor(0x5865f2)
-      .setThumbnail(targetUser.displayAvatarURL({ size: 256 }))
-      .setFooter({ text: `Son 30 Gün • ${new Date().toLocaleString('tr-TR')}` });
+      const stats = getUserStats(message.guild.id, targetUserId, 30);
 
-    await message.reply({ embeds: [embed] });
+      // Format time - professional
+      const formatTime = (seconds) => {
+        if (!seconds || seconds === 0) return '0s';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        
+        if (h > 0) return `${h}s ${m}d ${s}s`;
+        if (m > 0) return `${m}d ${s}s`;
+        return `${s}s`;
+      };
+
+      const embed = baseEmbed('📊 İSTATİSTİKLER', 0x5865f2)
+        .setAuthor({ 
+          name: targetUser.username, 
+          iconURL: targetUser.displayAvatarURL({ size: 256 }) 
+        })
+        .setThumbnail(targetUser.displayAvatarURL({ size: 256 }))
+        .addFields(
+          {
+            name: '💬 Toplam Mesaj',
+            value: `\`${stats.totalMessages}\``,
+            inline: true
+          },
+          {
+            name: '🔊 Toplam Ses Süresi',
+            value: `\`${formatTime(stats.totalVoice)}\``,
+            inline: true
+          },
+          {
+            name: '📷 Toplam Kamera Süresi',
+            value: `\`${formatTime(stats.totalCamera)}\``,
+            inline: true
+          },
+          {
+            name: '📺 Toplam Yayın/Ekran',
+            value: `\`${formatTime(stats.totalStream)}\``,
+            inline: true
+          }
+        )
+        .setColor(0x5865f2)
+        .setFooter({ text: `📅 Son 30 Gün • ${new Date().toLocaleString('tr-TR')}` });
+
+      await message.reply({ embeds: [embed] });
+    } catch (e) {
+      console.error('[STAT] Hata:', e.message);
+      const errEmbed = baseEmbed('❌ HATA', 0xff0000)
+        .setDescription(`Bir hata oluştu: ${e.message}`)
+        .setColor(0xff0000);
+      await message.reply({ embeds: [errEmbed], ephemeral: true });
+    }
     return;
   }
   if (cmd === 'top' || cmd === 'leaderboard' || cmd === 'lb') {
@@ -567,24 +596,24 @@ async function handleCommand({ client, message, cfg }) {
       const categoryArg = (args[0] || 'genel').toLowerCase();
       let category = 'genel';
       let categoryEmoji = '🏆';
-      let categoryTitle = 'GENEL';
+      let categoryTitle = 'GENEL LİDERLİK';
       
-      if (['mesaj', 'msg', 'message'].includes(categoryArg)) {
+      if (['mesaj', 'msg', 'message', 'm'].includes(categoryArg)) {
         category = 'mesaj';
         categoryEmoji = '💬';
-        categoryTitle = 'MESAJ';
-      } else if (['ses', 'voice', 'v'].includes(categoryArg)) {
+        categoryTitle = 'MESAJ LİDERLİĞİ';
+      } else if (['ses', 'voice', 'v', 'ses'].includes(categoryArg)) {
         category = 'ses';
         categoryEmoji = '🔊';
-        categoryTitle = 'SES';
-      } else if (['kamera', 'camera', 'cam'].includes(categoryArg)) {
+        categoryTitle = 'SES LİDERLİĞİ';
+      } else if (['kamera', 'camera', 'cam', 'c'].includes(categoryArg)) {
         category = 'kamera';
         categoryEmoji = '📷';
-        categoryTitle = 'KAMERA';
-      } else if (['yayın', 'stream', 'broadcast'].includes(categoryArg)) {
+        categoryTitle = 'KAMERA LİDERLİĞİ';
+      } else if (['yayın', 'stream', 'broadcast', 'y'].includes(categoryArg)) {
         category = 'yayın';
         categoryEmoji = '📺';
-        categoryTitle = 'YAYIN';
+        categoryTitle = 'YAYIN LİDERLİĞİ';
       }
       
       const rows = getLeaderboard(message.guild.id, category, 30);
@@ -607,16 +636,13 @@ async function handleCommand({ client, message, cfg }) {
         return `#${pos}`;
       };
       
-      let description = `${categoryEmoji} **${categoryTitle} LİDERLİĞİ** - Son 30 Gün\n`;
-      description += `🏢 Sunucu: **${message.guild.name}**\n`;
-      description += `👥 Aktif Üyeler: **${rows.length}**\n\n`;
+      let description = ``;
       
       if (rows.length > 0) {
         rows.forEach((row, i) => {
           let value = '';
           
           if (category === 'genel') {
-            const total = (row.messages || 0) + (row.voice || 0) + (row.camera || 0) + (row.stream || 0);
             value = `💬 ${row.messages || 0} | 🔊 ${formatTime(row.voice || 0)} | 📷 ${formatTime(row.camera || 0)} | 📺 ${formatTime(row.stream || 0)}`;
           } else if (category === 'mesaj') {
             value = `${row.messages || 0} mesaj`;
@@ -631,18 +657,26 @@ async function handleCommand({ client, message, cfg }) {
           description += `${getRankEmoji(i + 1)} <@${row.user_id}> • ${value}\n`;
         });
       } else {
-        description += '*Henüz veri bulunamadı*\n';
+        description = '*Henüz veri bulunamadı*';
       }
       
-      const embed = baseEmbed(`${categoryEmoji} LEADERBOARD`, 0x5865f2)
-        .setDescription(description)
+      const embed = baseEmbed(`${categoryEmoji} ${categoryTitle}`, 0x5865f2)
+        .setDescription(description || '*Veri yok*')
+        .addFields({
+          name: '📝 Komutlar',
+          value: `\`.lb\` Genel\n\`.lb mesaj\` Mesaj\n\`.lb ses\` Ses\n\`.lb kamera\` Kamera\n\`.lb yayın\` Yayın`,
+          inline: false
+        })
         .setColor(0x5865f2)
-        .setFooter({ text: `Kategoriler: .lb genel | .lb mesaj | .lb ses | .lb kamera | .lb yayın • ${new Date().toLocaleString('tr-TR')}` });
+        .setFooter({ text: `📊 Top 10 • Son 30 Gün • ${new Date().toLocaleString('tr-TR')}` });
       
       await message.reply({ embeds: [embed] });
     } catch (e) {
       console.error('[LEADERBOARD] Hata:', e.message);
-      await message.reply({ content: `❌ Leaderboard hesaplanırken hata oldu: ${e.message}` });
+      const errEmbed = baseEmbed('❌ HATA', 0xff0000)
+        .setDescription(`Leaderboard hesaplanırken hata oluştu: ${e.message}`)
+        .setColor(0xff0000);
+      await message.reply({ embeds: [errEmbed], ephemeral: true });
     }
     return;
   }

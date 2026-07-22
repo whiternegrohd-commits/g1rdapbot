@@ -20,7 +20,16 @@ const cfg = JSON.parse(
 
 const { handleCommand, isAdmin } = require('./commands');
 const { safeTruncate, baseEmbed, sendToChannel, sendDM, formatMessage } = require('./logger');
-const { addMessageCountDB: addMessageCountToDb, cleanupSessions } = require('./database');
+const {
+  addMessageCount: addMessageCountToDb,
+  cleanupSessions,
+  addVoiceSeconds,
+  addCameraSeconds,
+  addStreamSeconds,
+  startVoiceSession,
+  endVoiceSession,
+  isAFKChannel
+} = require('./database');
 const {
   handleGuardEvent,
   notifyChannelChangeDM,
