@@ -1785,45 +1785,6 @@ client.on('webhooksUpdate', async (channel) => {
 });
 
 // Ses istatistikleri
-client.on('voiceStateUpdate', async (oldState, newState) => {
-  const guild = newState.guild ?? oldState.guild;
-  if (!guild) return;
-  if (!isAllowedGuild(guild)) return;
-
-  const userId = newState.id ?? oldState.id;
-  if (!userId) return;
-
-  // Bot'u saçma kayıtlarından kurtarıyoruz
-  if (newState.member?.user?.bot || oldState.member?.user?.bot) return;
-
-  const oldCh = oldState.channelId ?? null;
-  const newCh = newState.channelId ?? null;
-
-  // Kanal değişimi yok ise -> sadece mute/deaf/suppress değişti, kaydetme
-  if (oldCh === newCh) return;
-
-  const key = `${guild.id}:${userId}`;
-  const now = Date.now();
-
-  // Eski kanaldan çıkış: session'ı kapat ve kaydet
-  if (oldCh) {
-    const sess = voiceSessions.get(key);
-    if (sess && sess.channelId === oldCh) {
-      const duration = now - sess.startMs;
-      // Minimum 5 saniye - sessiz açılması falan kontrol et
-      if (duration > 5000) {
-        addVoiceDurationSplit(guild.id, userId, oldCh, sess.startMs, now);
-      }
-    }
-    voiceSessions.delete(key);
-  }
-
-  // Yeni kanala giriş: session başlat
-  if (newCh) {
-    voiceSessions.set(key, { channelId: newCh, startMs: now });
-  }
-});
-
 // Ban olayı - YT1 güvenlik (2+ kişi ban)
 client.on('guildBanAdd', async (ban) => {
   if (!isAllowedGuild(ban.guild)) return;
