@@ -329,14 +329,6 @@ async function handleCommand({ client, message, cfg }) {
   if (cfg.guildId && String(message.guild.id) !== String(cfg.guildId)) return;
   if (message.author.bot) return;
 
-  // Message counting to database
-  try {
-    const { addMessageCountDB } = require('./database');
-    addMessageCountDB(message.guild.id, message.author.id, 1);
-  } catch (e) {
-    console.error('[MSG_COUNT] Hata:', e.message);
-  }
-
   const prefix = cfg.prefix ?? '.';
   if (!message.content.startsWith(prefix)) return;
 

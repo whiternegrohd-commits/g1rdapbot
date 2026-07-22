@@ -20,7 +20,7 @@ const cfg = JSON.parse(
 
 const { handleCommand, isAdmin } = require('./commands');
 const { safeTruncate, baseEmbed, sendToChannel, sendDM, formatMessage } = require('./logger');
-const { addMessageCount: addMessageCountDB, cleanupSessions } = require('./database');
+const { addMessageCountDB: addMessageCountToDb, cleanupSessions } = require('./database');
 const {
   handleGuardEvent,
   notifyChannelChangeDM,
@@ -968,134 +968,22 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-// Prefix komutlar
+// Message Create - Commands ve Message Counting
 client.on('messageCreate', async (message) => {
   if (message.guild && !isAllowedGuild(message.guild)) return;
   if (message.author.bot) return;
-  
-  // Spam kontrolleri
-  if (message.guild) {
-    const userId = message.author.id;
-    const content = message.content;
-    const tracker = trackSpam(userId, 'message');
-    
-    // 1. Kısaltılmış URL kontrolü
-    const links = content.match(/(https?:\/\/[^\s]+|www\.[^\s]+)/gi) || [];
-    for (const link of links) {
-      if (isShortURL(link)) {
-        await message.delete().catch(() => {});
-        const guardMsg = formatMessage('🚫', 'Kısaltılmış URL Tespit', `${message.author}\nKanal: <#${message.channelId}>\nURL: \`${link}\``);
-        await sendToChannel(client, cfg.logChannels.guard, guardMsg);
-        return;
-      }
-    }
-    
-    // 2. Mesaj spam (10+ mesaj 5 saniyede) - 2 uyarı + 3.de timeout
-    if (tracker.messages.length >= 10) {
-      const userTracker = spamTracker.get(userId);
-      userTracker.warnings = (userTracker.warnings ?? 0) + 1;
-      spamTracker.set(userId, userTracker);
-      
-      if (userTracker.warnings < 3) {
-        // Uyarı gönder
-        const warnMsg = formatMessage(
-          '⚠️', 
-          'Spam Uyarısı', 
-          `${message.author} - Mesaj spam tespit (10+ mesaj 5 saniyede)\n` +
-          `Uyarı Sayısı: ${userTracker.warnings}/2\n` +
-          `Kanal: <#${message.channelId}>\n` +
-          `Not: Bir daha yaparsanız 60 saniye timeout alacaksınız!`
-        );
-        await sendToChannel(client, cfg.logChannels.general, warnMsg);
-        
-        try {
-          await message.author.send({
-            content: `⚠️ **Spam Uyarısı!**\n\n${message.guild.name} sunucusunda spam yaptığınız tespit edildi.\n` +
-            `**Uyarı Sayısı:** ${userTracker.warnings}/2\n` +
-            `**Sonraki ihlalde:** 60 saniye timeout alacaksınız!`
-          }).catch(() => {});
-        } catch {}
-      } else {
-        // 3. kez: Timeout
-        await message.member.timeout(60000, 'Spam: 3 kez uyarıdan sonra').catch(() => {});
-        
-        const timeoutMsg = formatMessage(
-          '⏱️', 
-          'Spam Timeout', 
-          `${message.author} - Mesaj spam (3 kez uyarıdan sonra)\n` +
-          `Timeout Süresi: 60 saniye\n` +
-          `Kanal: <#${message.channelId}>`
-        );
-        await sendToChannel(client, cfg.logChannels.general, timeoutMsg);
-        
-        try {
-          await message.author.send({
-            content: `⏱️ **60 Saniye Timeout!**\n\n${message.guild.name} sunucusunda spam yaptığınız için 60 saniye timeout aldınız.\n` +
-            `Uyarıları dikkate almadığınız için bu cezaya tabi tutuldunuz.`
-          }).catch(() => {});
-        } catch {}
-        
-        // Reset warnings
-        const resetTracker = spamTracker.get(userId);
-        resetTracker.warnings = 0;
-        resetTracker.messages = [];
-        spamTracker.set(userId, resetTracker);
-      }
-      return;
-    }
-    
-    // 3. Link spam (5+ link 10 saniyede)
-    if (tracker.links.length >= 5) {
-      await message.member.timeout(60000, 'Link spam').catch(() => {});
-      const spamMsg = formatMessage('⏱️', 'Link Spam Timeout', `${message.author} - Link spam (5+ link 10 saniyede)\nTimeout Süresi: 60 saniye\nKanal: <#${message.channelId}>`);
-      await sendToChannel(client, cfg.logChannels.general, spamMsg);
-      spamTracker.delete(userId);
-      return;
-    }
-    
-    // Link count tracking
-    if (links.length > 0) {
-      trackSpam(userId, 'link');
-    }
-    
-    // 4. Mention spam (@everyone/@here blocker) - 1 kere izin, 2. kere block
-    const mentionData = mentionSpamTracker.get(userId) ?? { count: 0, lastAt: 0 };
-    const now = Date.now();
-    
-    // 24 saati aşmışsa reset et
-    if (now - mentionData.lastAt > 24 * 60 * 60 * 1000) {
-      mentionData.count = 0;
-    }
-    
-    const hasMentionEveryone = message.mentions.has(message.guild.roles.everyone);
-    const hasHereMention = content.includes('@here');
-    
-    if (hasMentionEveryone || hasHereMention) {
-      mentionData.count++;
-      mentionData.lastAt = now;
-      mentionSpamTracker.set(userId, mentionData);
-      
-      if (mentionData.count >= 2) {
-        // 2. kere - block et
-        await message.delete().catch(() => {});
-        await message.author.send({ content: `⛔ **Mention Spam Yasak!**\n\nGirdap Sunucusu'nda @everyone veya @here mention'ı bir kez yapılabilir.\nSiz zaten bunu yaptınız ve tekrar denediğiniz için mesajınız silindi.` }).catch(() => {});
-        
-        const mentionMsg = formatMessage('🚫', 'Mention Spam Bloklandi (2. Kere)', `${message.author}\nKanal: <#${message.channelId}>\nTip: ${hasMentionEveryone ? '@everyone' : '@here'}`);
-        await sendToChannel(client, cfg.logChannels.guard, mentionMsg);
-        return;
-      } else {
-        // 1. kere - uyar et
-        const warnMsg = formatMessage('⚠️', 'Mention Spam Uyarısı (1. Kere)', `${message.author}\nTip: ${hasMentionEveryone ? '@everyone' : '@here'}\nNot: Bir daha yaparsanız mesajınız silinecektir!`);
-        await sendToChannel(client, cfg.logChannels.guard, warnMsg);
-        return;
-      }
-    }
-    
-    // Mesaj sayısını track et
-    addMessageCount(message.guild.id, message.author.id, message.channelId, new Date());
+
+  // Message counting to database (TÜM mesajlar)
+  try {
+    addMessageCountToDb(message.guild.id, message.author.id, 1);
+  } catch (e) {
+    console.error('[MSG_COUNT] Hata:', e.message);
   }
-  
-  await handleCommand({ client, message, cfg });
+
+  // Handle commands
+  await handleCommand({ client, message, cfg }).catch(e => {
+    console.error('[COMMAND] Hata:', e.message);
+  });
 });
 
 // Welcome
