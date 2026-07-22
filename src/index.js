@@ -45,7 +45,7 @@ const {
   handleBulkChannelGuard,
   handleChannelDeleteRecreate
 } = require('./guard');
-const { addMessageCount, addVoiceDurationSplit, getJails, removeJail, isVipGranted, getGuildLeaderboard } = require('./storage');
+const { getJails, removeJail, isVipGranted, getGuildLeaderboard } = require('./storage');
 const { releaseMemberFromJail } = require('./jail');
 const { createBackup, cleanOldBackups } = require('./backup');
 const { logMemberActivity, logBotInternal, logCommandUsage } = require('./logger');
