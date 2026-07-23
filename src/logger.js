@@ -86,14 +86,102 @@ function logBotInternal({ client, cfg, level = 'INFO', title, message, details =
     'SUCCESS': '✅'
   };
 
-  const embed = baseEmbed(`${emoji[level]} ${title}`, colorMap[level])
-    .setDescription(
-      `📌 **Seviye:** ${level}\n` +
-      `📝 **Mesaj:** ${message}\n` +
-      `${details ? `📋 **Detay:** ${safeTruncate(details, 500)}\n` : ''}` +
-      `⏰ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
-    )
-    .setColor(colorMap[level]);
+  const borderEmoji = '━';
+  const timestamp = new Date();
+  const timeStr = timestamp.toLocaleString('tr-TR', { 
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+  
+  const uptime = Math.floor(process.uptime());
+  const days = Math.floor(uptime / 86400);
+  const hours = Math.floor((uptime % 86400) / 3600);
+  const mins = Math.floor((uptime % 3600) / 60);
+  const secs = uptime % 60;
+  
+  let uptimeStr = '';
+  if (days > 0) uptimeStr += `${days}g `;
+  if (hours > 0) uptimeStr += `${hours}s `;
+  if (mins > 0) uptimeStr += `${mins}d `;
+  uptimeStr += `${secs}s`;
+
+  const embed = new EmbedBuilder()
+    .setTitle(`${emoji[level]} ${title}`)
+    .setColor(colorMap[level])
+    .setDescription(message)
+    .setTimestamp(timestamp);
+
+  // Fields ekle
+  const fields = [];
+
+  // Seviye
+  fields.push({
+    name: '🎯 Seviye',
+    value: `\`${level}\``,
+    inline: true
+  });
+
+  // Bot info
+  if (client && client.user) {
+    fields.push({
+      name: '🤖 Bot',
+      value: `\`${client.user.tag}\``,
+      inline: true
+    });
+
+    fields.push({
+      name: '👥 Kullanıcılar',
+      value: `\`${client.users.cache.size}\``,
+      inline: true
+    });
+  }
+
+  // Guild count
+  if (client) {
+    fields.push({
+      name: '🏢 Sunucular',
+      value: `\`${client.guilds.cache.size}\``,
+      inline: true
+    });
+  }
+
+  // Uptime
+  fields.push({
+    name: '⏱️ Çalışma Süresi',
+    value: `\`${uptimeStr}\``,
+    inline: true
+  });
+
+  // Memory
+  if (true) {
+    const used = process.memoryUsage();
+    const heapUsedMB = Math.round(used.heapUsed / 1024 / 1024);
+    const heapTotalMB = Math.round(used.heapTotal / 1024 / 1024);
+    fields.push({
+      name: '💾 Bellek',
+      value: `\`${heapUsedMB}MB / ${heapTotalMB}MB\``,
+      inline: true
+    });
+  }
+
+  // Details (if provided)
+  if (details) {
+    fields.push({
+      name: '📋 Detaylar',
+      value: `\`\`\`\n${safeTruncate(details, 500)}\n\`\`\``,
+      inline: false
+    });
+  }
+
+  embed.addFields(...fields);
+
+  // Footer
+  const footerText = `${borderEmoji} Sistem Durumu • ${timeStr}`;
+  embed.setFooter({ text: footerText, iconURL: client?.user?.displayAvatarURL() });
 
   sendToChannel(client, cfg.logChannels.botInternal, { embeds: [embed] }).catch(() => {});
 }
