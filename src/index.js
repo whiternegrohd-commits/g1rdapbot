@@ -1896,11 +1896,6 @@ client.on('error', (e) => {
   });
 });
 
-// Voice State Update - Streaming ve Camera Tracking
-const voiceSessions = new Map(); // userId -> { channelId, startTime }
-const cameraSessions = new Map(); // userId -> { channelId, startTime }
-const streamSessions = new Map(); // userId -> { channelId, startTime }
-
 client.on('voiceStateUpdate', async (oldState, newState) => {
   if (!isAllowedGuild(newState.guild)) return;
   
