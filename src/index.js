@@ -1903,57 +1903,98 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     const userId = newState.member?.id;
     const guildId = newState.guild.id;
     
+    // Bot mu? Skip
     if (!userId || newState.member?.user?.bot) return;
 
-    // Voice channel change
-    if (oldState.channelId !== newState.channelId) {
-      // Left voice
-      if (oldState.channelId && !isAFKChannel(guildId, oldState.channelId)) {
-        const duration = endVoiceSession(guildId, userId, 'voice');
-        if (duration > 0) {
-          addVoiceSeconds(guildId, userId, duration);
-        }
-        voiceSessions.delete(userId);
+    // ============ VOICE CHANNEL TRACKING ============
+    const oldChannelId = oldState.channelId;
+    const newChannelId = newState.channelId;
+    const isAFKOld = oldChannelId ? isAFKChannel(guildId, oldChannelId) : false;
+    const isAFKNew = newChannelId ? isAFKChannel(guildId, newChannelId) : false;
+
+    // Kanalı değiştirdi veya tamamen çıktı
+    if (oldChannelId && oldChannelId !== newChannelId && !isAFKOld) {
+      const duration = endVoiceSession(guildId, userId, 'voice');
+      if (duration > 0) {
+        addVoiceSeconds(guildId, userId, duration);
+        console.log(`[VOICE] ${userId} çıktı → ${duration}s kaydedildi`);
       }
-      
-      // Joined voice
-      if (newState.channelId && !isAFKChannel(guildId, newState.channelId)) {
-        startVoiceSession(guildId, userId, newState.channelId, 'voice');
-        voiceSessions.set(userId, { channelId: newState.channelId, startTime: Date.now() });
-      }
+      voiceSessions.delete(userId);
     }
 
-    // Streaming tracking
-    const wasStreaming = oldState.streaming;
-    const isStreaming = newState.streaming;
+    // Yeni ses kanalına girdi
+    if (newChannelId && newChannelId !== oldChannelId && !isAFKNew) {
+      startVoiceSession(guildId, userId, newChannelId, 'voice');
+      voiceSessions.set(userId, { channelId: newChannelId, startTime: Date.now() });
+      console.log(`[VOICE] ${userId} girdi → ${newChannelId}`);
+    }
+
+    // Tamamen voice'dan çıktı
+    if (oldChannelId && !newChannelId && !isAFKOld) {
+      const duration = endVoiceSession(guildId, userId, 'voice');
+      if (duration > 0) {
+        addVoiceSeconds(guildId, userId, duration);
+      }
+      voiceSessions.delete(userId);
+      
+      // Aktif stream/camera varsa kapat
+      const streamDur = endVoiceSession(guildId, userId, 'stream');
+      if (streamDur > 0) addStreamSeconds(guildId, userId, streamDur);
+      const cameraDur = endVoiceSession(guildId, userId, 'camera');
+      if (cameraDur > 0) addCameraSeconds(guildId, userId, cameraDur);
+      
+      streamSessions.delete(userId);
+      cameraSessions.delete(userId);
+    }
+
+    // ============ STREAMING TRACKING ============
+    const wasStreaming = Boolean(oldState.streaming);
+    const isStreaming = Boolean(newState.streaming);
     
-    if (isStreaming && !wasStreaming && newState.channelId && !isAFKChannel(guildId, newState.channelId)) {
-      startVoiceSession(guildId, userId, newState.channelId, 'stream');
-      streamSessions.set(userId, { channelId: newState.channelId, startTime: Date.now() });
-    } else if (!isStreaming && wasStreaming) {
+    if (isStreaming && !wasStreaming && newChannelId && !isAFKNew) {
+      startVoiceSession(guildId, userId, newChannelId, 'stream');
+      streamSessions.set(userId, { channelId: newChannelId, startTime: Date.now() });
+      console.log(`[STREAM] ${userId} yayın başladı`);
+    } 
+    if (!isStreaming && wasStreaming) {
       const duration = endVoiceSession(guildId, userId, 'stream');
       if (duration > 0) {
         addStreamSeconds(guildId, userId, duration);
+        console.log(`[STREAM] ${userId} yayın bitti → ${duration}s kaydedildi`);
       }
       streamSessions.delete(userId);
     }
 
-    // Camera tracking (selfVideo: true = camera AÇIK)
-    const wasCameraOn = oldState.selfVideo === true;
-    const isCameraOn = newState.selfVideo === true;
+    // ============ CAMERA TRACKING (FİX'LENDİ!) ============
+    // Discord API'de selfVideo şu olabilir: true, false, null
+    // Null durumunu da handle et
+    const wasCameraOn = oldState.selfVideo === true || oldState.selfVideo === 1;
+    const isCameraOn = newState.selfVideo === true || newState.selfVideo === 1;
     
-    if (isCameraOn && !wasCameraOn && newState.channelId && !isAFKChannel(guildId, newState.channelId)) {
-      startVoiceSession(guildId, userId, newState.channelId, 'camera');
-      cameraSessions.set(userId, { channelId: newState.channelId, startTime: Date.now() });
-    } else if (!isCameraOn && wasCameraOn) {
+    if (isCameraOn && !wasCameraOn && newChannelId && !isAFKNew) {
+      startVoiceSession(guildId, userId, newChannelId, 'camera');
+      cameraSessions.set(userId, { channelId: newChannelId, startTime: Date.now() });
+      console.log(`[CAMERA] ${userId} kamera açtı`);
+    } 
+    if (!isCameraOn && wasCameraOn) {
       const duration = endVoiceSession(guildId, userId, 'camera');
       if (duration > 0) {
         addCameraSeconds(guildId, userId, duration);
+        console.log(`[CAMERA] ${userId} kamera kapattı → ${duration}s kaydedildi`);
       }
       cameraSessions.delete(userId);
     }
+
+    // Debug: Mute/Deaf tracking (bilgi amaçlı)
+    if (oldState.selfMute !== newState.selfMute) {
+      console.log(`[MUTE] ${userId} ${newState.selfMute ? 'muted' : 'unmuted'}`);
+    }
+    if (oldState.selfDeaf !== newState.selfDeaf) {
+      console.log(`[DEAF] ${userId} ${newState.selfDeaf ? 'deafened' : 'undeafened'}`);
+    }
+
   } catch (e) {
-    console.error('[VOICE_UPDATE] Hata:', e.message);
+    console.error('[VOICE_UPDATE] ⚠️ Hata:', e.message, e.stack);
   }
 });
 
