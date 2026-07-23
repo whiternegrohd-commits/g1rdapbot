@@ -14,6 +14,9 @@ const {
   StringSelectMenuBuilder
 } = require('discord.js');
 
+// Production middleware
+const { RateLimiter, MemoryManager, ErrorHandler, RequestDeduplicator, HealthCheck } = require('./middleware');
+
 const cfg = JSON.parse(
   fs.readFileSync(path.join(__dirname, '..', 'config.json'), 'utf8')
 );
@@ -50,21 +53,36 @@ const { releaseMemberFromJail } = require('./jail');
 const { createBackup, cleanOldBackups } = require('./backup');
 const { logMemberActivity, logBotInternal, logCommandUsage } = require('./logger');
 
-// Silinen mesajları takip et (guildId:channelId -> { author, content, at })
+// ====== MIDDLEWARE INITIALIZATION ======
+const rateLimiter = new RateLimiter(10, 1000); // 10 requests/sec per user
+const memoryManager = new MemoryManager(5000); // Max 5000 entries per map
+const errorHandler = new ErrorHandler(cfg.logChannels?.botInternal);
+const requestDedup = new RequestDeduplicator(5000); // 5 sec dedup window
+const healthCheck = new HealthCheck();
+
+// Map'leri memory manager'a kaydet
 const deletedMessages = new Map();
 global.deletedMessages = deletedMessages;
 
-// YT1 violation tracking
 const yt1Violations = new Map();
 const yt1SuspendedUsers = new Map();
-
-// Ban tracker
 const banTracker = new Map();
-
-// Voice session tracking - ses, kamera, stream sürelerini hesaplamak için
 const voiceSessions = new Map();
 const cameraSessions = new Map();
 const streamSessions = new Map();
+const spamTracker = new Map();
+const mentionSpamTracker = new Map();
+
+// Memory tracking
+memoryManager.registerMap(deletedMessages, 'deletedMessages');
+memoryManager.registerMap(yt1Violations, 'yt1Violations');
+memoryManager.registerMap(yt1SuspendedUsers, 'yt1SuspendedUsers');
+memoryManager.registerMap(banTracker, 'banTracker');
+memoryManager.registerMap(voiceSessions, 'voiceSessions');
+memoryManager.registerMap(cameraSessions, 'cameraSessions');
+memoryManager.registerMap(streamSessions, 'streamSessions');
+memoryManager.registerMap(spamTracker, 'spamTracker');
+memoryManager.registerMap(mentionSpamTracker, 'mentionSpamTracker');
 
 const client = new Client({
   intents: [
@@ -76,7 +94,11 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.GuildVoiceStates
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User]
+  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User],
+  // Production settings
+  allowedMentions: { parse: ['users'] },
+  intents: 129023, // All intents except some dangerous ones
+  retryLimit: 3
 });
 
 function channelLink(guildId, channelId) {
@@ -120,6 +142,13 @@ async function findRoleUpdateExecutor(member) {
 client.on('ready', async () => {
   console.log(`✅ Bot giriş yaptı: ${client.user.tag}`);
   
+  // ====== PRODUCTION STARTUP ======
+  healthCheck.updateHeartbeat();
+  
+  // Memory manager'ı başlat (5 dakikada bir cleanup)
+  memoryManager.startCleanup();
+  console.log('💾 Memory manager başlatıldı');
+  
   // Cleanup stale voice sessions
   cleanupSessions();
   console.log('🧹 Stale voice sessions temizlendi');
@@ -131,7 +160,7 @@ client.on('ready', async () => {
     level: 'SUCCESS',
     title: 'Bot Başlatıldı',
     message: `${client.user.tag} başarılı bir şekilde başlatıldı.`,
-    details: `Guilds: ${client.guilds.cache.size} • Users: ${client.users.cache.size}`
+    details: `Guilds: ${client.guilds.cache.size} • Users: ${client.users.cache.size} • Memory: ${memoryManager.getStats().heapUsedMB}MB`
   });
   
   if (cfg.guildId) {
@@ -144,7 +173,7 @@ client.on('ready', async () => {
       client.user.setActivity(status);
       console.log(`🎯 Bot durumu ayarlandı: ${status}`);
     } catch (e) {
-      console.error(`⚠️ Bot durumu ayarlanamadı:`, e.message);
+      await errorHandler.handle(e, { event: 'ready', action: 'setActivity' });
     }
   }
 
@@ -461,12 +490,6 @@ async function syncTagRole(member) {
     await member.roles.remove(tagCfg.roleId, 'Sunucu tagı kaldırıldı').catch(() => {});
   }
 }
-
-// Spam tracking (userId -> { messages, links, emojis, warnings, lastCheck })
-const spamTracker = new Map();
-
-// Mention spam tracking (userId -> { count, lastAt })
-const mentionSpamTracker = new Map();
 
 function trackSpam(userId, type) {
   const now = Date.now();
@@ -984,20 +1007,39 @@ client.on('interactionCreate', async (interaction) => {
 
 // Message Create - Commands ve Message Counting
 client.on('messageCreate', async (message) => {
-  if (message.guild && !isAllowedGuild(message.guild)) return;
-  if (message.author.bot) return;
-
-  // Message counting to database (TÜM mesajlar)
   try {
-    addMessageCountToDb(message.guild.id, message.author.id, 1);
-  } catch (e) {
-    console.error('[MSG_COUNT] Hata:', e.message);
-  }
+    if (message.guild && !isAllowedGuild(message.guild)) return;
+    if (message.author.bot) return;
 
-  // Handle commands
-  await handleCommand({ client, message, cfg }).catch(e => {
-    console.error('[COMMAND] Hata:', e.message);
-  });
+    // ====== RATE LIMITING ======
+    if (rateLimiter.isLimited(`msg_${message.author.id}`)) {
+      console.warn(`[RATELIMIT] ${message.author.id} çok hızlı mesaj gönderiyor`);
+      return;
+    }
+
+    // ====== DEDUPLICATION ======
+    const dedupeKey = `${message.channelId}_${message.author.id}_${message.content}`;
+    if (requestDedup.isDuplicate(dedupeKey)) {
+      return; // Duplicate message, skip
+    }
+
+    healthCheck.recordMessage();
+    healthCheck.updateHeartbeat();
+
+    // Message counting to database (TÜM mesajlar)
+    try {
+      addMessageCountToDb(message.guild.id, message.author.id, 1);
+    } catch (e) {
+      await errorHandler.handle(e, { event: 'messageCreate', action: 'addMessageCount' });
+    }
+
+    // Handle commands
+    await handleCommand({ client, message, cfg }).catch(e => {
+      errorHandler.handle(e, { event: 'messageCreate', action: 'handleCommand', userId: message.author.id });
+    });
+  } catch (e) {
+    await errorHandler.handle(e, { event: 'messageCreate', userId: message?.author?.id });
+  }
 });
 
 // Welcome
@@ -1997,6 +2039,49 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     console.error('[VOICE_UPDATE] ⚠️ Hata:', e.message, e.stack);
   }
 });
+
+// ====== GLOBAL ERROR HANDLERS ======
+process.on('unhandledRejection', async (reason, promise) => {
+  console.error('[UNHANDLED_REJECTION]', reason);
+  await errorHandler.handle(new Error(String(reason)), { 
+    type: 'unhandledRejection',
+    promise: promise.toString() 
+  });
+  healthCheck.recordError();
+});
+
+process.on('uncaughtException', async (error) => {
+  console.error('[UNCAUGHT_EXCEPTION]', error);
+  await errorHandler.handle(error, { type: 'uncaughtException' });
+  healthCheck.recordError();
+  
+  // Uncaught exception kritik, bot'u restart et
+  console.error('Bot kritik hatadan dolayı kapatılıyor...');
+  process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('📴 SIGTERM alındı, bot kapatılıyor...');
+  await client.destroy();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('📴 SIGINT alındı, bot kapatılıyor...');
+  await client.destroy();
+  process.exit(0);
+});
+
+// Heartbeat monitor
+setInterval(() => {
+  healthCheck.updateHeartbeat();
+  const health = healthCheck.getHealth();
+  
+  if (!health.healthy) {
+    console.warn('[HEALTH] ⚠️ Bot heartbeat problemi!');
+  }
+}, 10000);
 
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ DISCORD_TOKEN yok. .env dosyasını oluşturup token gir.');
