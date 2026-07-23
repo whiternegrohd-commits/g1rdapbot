@@ -533,7 +533,7 @@ async function handleCommand({ client, message, cfg }) {
         targetUserId = member.id;
       }
 
-      const stats = getUserStats(message.guild.id, targetUserId, 30);
+      const stats = getUserStats(message.guild.id, targetUserId, 10);
 
       // Format time - professional
       const formatTime = (seconds) => {
@@ -576,7 +576,7 @@ async function handleCommand({ client, message, cfg }) {
           }
         )
         .setColor(0x5865f2)
-        .setFooter({ text: `📅 Son 30 Gün • ${new Date().toLocaleString('tr-TR')}` });
+        .setFooter({ text: `📅 Son 10 Gün • ${new Date().toLocaleString('tr-TR')}` });
 
       await message.reply({ embeds: [embed] });
     } catch (e) {
@@ -616,7 +616,7 @@ async function handleCommand({ client, message, cfg }) {
         categoryTitle = 'YAYIN LİDERLİĞİ';
       }
       
-      const rows = getLeaderboard(message.guild.id, category, 30);
+      const rows = getLeaderboard(message.guild.id, category, 10);
       
       const formatTime = (seconds) => {
         if (seconds === 0 || !seconds) return '0s';
@@ -668,7 +668,7 @@ async function handleCommand({ client, message, cfg }) {
           inline: false
         })
         .setColor(0x5865f2)
-        .setFooter({ text: `📊 Top 10 • Son 30 Gün • ${new Date().toLocaleString('tr-TR')}` });
+        .setFooter({ text: `📊 Top 10 • Son 10 Gün • ${new Date().toLocaleString('tr-TR')}` });
       
       await message.reply({ embeds: [embed] });
     } catch (e) {

@@ -158,7 +158,7 @@ function endVoiceSession(guildId, userId, sessionType = 'voice') {
   return duration;
 }
 
-function getUserStats(guildId, userId, days = 30) {
+function getUserStats(guildId, userId, days = 10) {
   const dates = [];
   for (let i = 0; i < days; i++) {
     const d = new Date();
@@ -189,7 +189,7 @@ function getUserStats(guildId, userId, days = 30) {
   return { totalMessages, totalVoice, totalCamera, totalStream };
 }
 
-function getLeaderboard(guildId, category = 'genel', days = 30) {
+function getLeaderboard(guildId, category = 'genel', days = 10) {
   const dates = [];
   for (let i = 0; i < days; i++) {
     const d = new Date();

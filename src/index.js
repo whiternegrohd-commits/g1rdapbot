@@ -61,6 +61,11 @@ const yt1SuspendedUsers = new Map();
 // Ban tracker
 const banTracker = new Map();
 
+// Voice session tracking - ses, kamera, stream sürelerini hesaplamak için
+const voiceSessions = new Map();
+const cameraSessions = new Map();
+const streamSessions = new Map();
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
