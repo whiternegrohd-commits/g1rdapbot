@@ -1447,71 +1447,31 @@ client.on('messageDelete', async (message) => {
     at: Date.now()
   });
 
-  // Mesaj verilerini güvenli al
-  const messageContent = message.partial ? '(mesaj cache yok)' : (message.content || '(boş)');
-  const authorId = message.author?.id || 'Bilinmeyen';
-  const authorTag = message.author?.tag || 'Bilinmeyen Kullanıcı';
-  const authorAvatar = message.author?.displayAvatarURL({ size: 256 }) || null;
-  const contentTruncated = safeTruncate(messageContent, 500);
+  const content = message.partial ? '(mesaj cache yok)' : (message.content || '(boş)');
+  const author = message.author ? `${message.author.tag} (\`${message.author.id}\`)` : '(bilinmiyor)';
+  const contentTruncated = safeTruncate(content, 500);
   
   // Kimin sildiğini bul (audit log)
-  let deletedBy = '⚠️ Bot/Sistem';
+  let deletedBy = 'Bot/Bilinmeyen';
   try {
     const logs = await message.guild.fetchAuditLogs({ limit: 5, type: 72 }).catch(() => null);
-    const entry = logs?.entries?.find(e => 
-      e.targetId === message.author?.id && 
-      Date.now() - e.createdTimestamp < 5000
-    );
-    if (entry?.executor) {
+    const entry = logs?.entries?.find(e => e.targetId === message.author?.id && Date.now() - e.createdTimestamp < 5000);
+    if (entry && entry.executor) {
       deletedBy = `${entry.executor.tag} (\`${entry.executor.id}\`)`;
     }
   } catch {}
 
-  // 🗑️ MESAJ SİLİNDİ LOGU
-  const embed = baseEmbed('🗑️ MESAJ SİLİNDİ', 0xed4245)
-    .setDescription(
-      `📝 **Mesaj İçeriği:**\n\`\`\`\n${contentTruncated}\n\`\`\``
-    )
-    .addFields(
-      {
-        name: '👤 Yazar Bilgisi',
-        value:
-          `• **İsim:** ${authorTag}\n` +
-          `• **ID:** \`${authorId}\`${message.author?.createdTimestamp ? `\n• **Hesap Yaşı:** \`${formatDuration(Date.now() - message.author.createdTimestamp)}\`` : ''}`,
-        inline: true
-      },
-      {
-        name: '🗑️ Silme Bilgisi',
-        value:
-          `• **Silen:** ${deletedBy}\n` +
-          `• **Zaman:** \`${getFormattedTime()}\``,
-        inline: true
-      },
-      {
-        name: '📍 Kanal Bilgisi',
-        value:
-          `• **Kanal:** <#${message.channelId}>\n` +
-          `• **Kanal ID:** \`${message.channelId}\``,
-        inline: false
-      },
-      {
-        name: '📊 Mesaj Metadata',
-        value:
-          `• **Mesaj ID:** \`${message.id}\`\n` +
-          `• **Gönderme Zamanı:** \`${message.createdTimestamp ? new Date(message.createdTimestamp).toLocaleString('tr-TR') : 'Bilinmiyor'}\``,
-        inline: false
-      }
-    )
-    .setFooter({
-      text: `━ Mesaj Denetim Sistemi • ${getFullTimestamp()}`,
-      iconURL: client.user?.displayAvatarURL()
-    });
-
-  if (authorAvatar) {
-    embed.setThumbnail(authorAvatar);
-  }
-
-  await sendToChannel(client, cfg.logChannels.general, { embeds: [embed] });
+  await sendToChannel(client, cfg.logChannels.general, {
+    embeds: [
+      baseEmbed('🗑️ Mesaj silindi', 0xed4245)
+        .setDescription(
+          `**Yazar:** ${author}\n` +
+          `**Silen:** ${deletedBy}\n` +
+          `**Kanal:** <#${message.channelId}>\n` +
+          `**İçerik:**\n${contentTruncated}`
+        )
+    ]
+  });
 });
 
 // Mesaj edit logu
@@ -1524,40 +1484,14 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
   const after = newMessage.partial ? '(yeni mesaj cache yok)' : (newMessage.content || '(boş)');
   if (before === after) return;
 
-  // ✏️ MESAJ DÜZENLEME LOGU
   await sendToChannel(client, cfg.logChannels.general, {
     embeds: [
-      baseEmbed('✏️ MESAJ DÜZENLEND İ', 0xfaa61a)
-        .setDescription(
-          `👤 **Yazar:** ${newMessage.author.tag} (\`${newMessage.author.id}\`)\n` +
-          `📍 **Kanal:** <#${newMessage.channelId}>\n` +
-          `⏰ **Zaman:** \`${getFormattedTime()}\``
-        )
-        .addFields(
-          {
-            name: '📝 ÖNCEKİ MESAJ',
-            value: `\`\`\`\n${safeTruncate(before, 400)}\n\`\`\``,
-            inline: false
-          },
-          {
-            name: '📝 YENİ MESAJ',
-            value: `\`\`\`\n${safeTruncate(after, 400)}\n\`\`\``,
-            inline: false
-          },
-          {
-            name: '📊 Düzenleme Bilgisi',
-            value:
-              `• **Mesaj ID:** \`${newMessage.id}\`\n` +
-              `• **Gönderme Zamanı:** \`${new Date(newMessage.createdTimestamp).toLocaleString('tr-TR')}\`\n` +
-              `• **Düzenleme Zamanı:** \`${new Date(newMessage.editedTimestamp).toLocaleString('tr-TR')}\``,
-            inline: false
-          }
-        )
-        .setThumbnail(newMessage.author.displayAvatarURL({ size: 256 }))
-        .setFooter({
-          text: `━ Mesaj Denetim Sistemi • ${getFullTimestamp()}`,
-          iconURL: client.user?.displayAvatarURL()
-        })
+      baseEmbed('✏️ Mesaj düzenlendi', 0xfaa61a).setDescription(
+        `**Yazar:** ${newMessage.author.tag} (\`${newMessage.author.id}\`)\n` +
+        `**Kanal:** <#${newMessage.channelId}>\n\n` +
+        `**Önce:**\n${safeTruncate(before, 900)}\n\n` +
+        `**Sonra:**\n${safeTruncate(after, 900)}`
+      )
     ]
   });
 });
