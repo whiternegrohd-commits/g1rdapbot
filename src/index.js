@@ -1448,25 +1448,13 @@ client.on('messageDelete', async (message) => {
   });
 
   const content = message.partial ? '(mesaj cache yok)' : (message.content || '(boş)');
-  let author = message.author ? `${message.author.tag} (\`${message.author.id}\`)` : '(bilinmiyor)';
   const contentTruncated = safeTruncate(content, 500);
   
-  // Eğer author null ise, audit log'dan bul
-  if (!message.author) {
-    try {
-      const logs = await message.guild.fetchAuditLogs({ limit: 10, type: AuditLogEvent.MessageDelete }).catch(() => null);
-      const entry = logs?.entries?.find(e => Date.now() - e.createdTimestamp < 5000);
-      if (entry?.targetId) {
-        author = `${entry.targetId} (cache yok)`;
-      }
-    } catch {}
-  }
-  
   // Kimin sildiğini bul (audit log)
-  let deletedBy = 'Bot/Bilinmeyen';
+  let deletedBy = 'Bot/Sistem';
   try {
     const logs = await message.guild.fetchAuditLogs({ limit: 5, type: AuditLogEvent.MessageDelete }).catch(() => null);
-    const entry = logs?.entries?.find(e => Date.now() - e.createdTimestamp < 5000);
+    const entry = logs?.entries?.first();
     if (entry && entry.executor) {
       deletedBy = `${entry.executor.tag} (\`${entry.executor.id}\`)`;
     }
@@ -1476,7 +1464,6 @@ client.on('messageDelete', async (message) => {
     embeds: [
       baseEmbed('🗑️ Mesaj silindi', 0xed4245)
         .setDescription(
-          `**Yazar:** ${author}\n` +
           `**Silen:** ${deletedBy}\n` +
           `**Kanal:** <#${message.channelId}>\n` +
           `**İçerik:**\n${contentTruncated}`
