@@ -84,130 +84,88 @@ const requestDedup = new RequestDeduplicator(5000); // 5 sec dedup window
 const healthCheck = new HealthCheck();
 
 // ═══════════════════════════════════════════════════════════════════
-// 💾 CUSTOM MESSAGE CACHE SISTEMI (24 saat + 5000 mesaj limiti)
+// 💾 GLOBAL MESSAGE CACHE (Simple Map - 24 saat otomatik temizleme)
 // ═══════════════════════════════════════════════════════════════════
 
-class MessageCache {
-  constructor(maxMessages = 5000, maxAgeMs = 24 * 60 * 60 * 1000) {
-    this.cache = new Map();
-    this.maxMessages = maxMessages;
-    this.maxAgeMs = maxAgeMs;
-    this.cleanupInterval = setInterval(() => this.cleanup(), 60 * 60 * 1000); // Saatte bir temizle
-  }
+const msgCache = new Map();
+const MAX_CACHE_AGE = 24 * 60 * 60 * 1000; // 24 saat (milisaniye)
 
-  /**
-   * Mesajı cache'e ekle
-   * @param {Message} message - Discord mesajı
-   */
-  set(message) {
-    if (!message?.id || !message?.author) return;
-
-    const key = `${message.guildId}:${message.id}`;
-    const data = {
-      id: message.id,
-      guildId: message.guildId,
-      channelId: message.channelId,
-      authorId: message.author.id,
-      authorTag: message.author.tag || `${message.author.username}#${message.author.discriminator || '0'}`,
-      authorUsername: message.author.username,
-      content: message.content || '(boş mesaj)',
-      attachments: message.attachments.map(att => ({
-        name: att.name,
-        size: att.size,
-        url: att.url,
-        contentType: att.contentType
-      })),
-      timestamp: Date.now(),
-      createdTimestamp: message.createdTimestamp
-    };
-
-    this.cache.set(key, data);
-    
-    // Max mesaj sayısını aş ıysa eski olanı sil
-    if (this.cache.size > this.maxMessages) {
-      const oldestKey = this.cache.keys().next().value;
-      this.cache.delete(oldestKey);
+// Saatte bir 24 saatten eski mesajları temizle
+setInterval(() => {
+  const now = Date.now();
+  let deleted = 0;
+  for (const [msgId, data] of msgCache.entries()) {
+    if (now - data.timestamp > MAX_CACHE_AGE) {
+      msgCache.delete(msgId);
+      deleted++;
     }
   }
-
-  /**
-   * Mesajı cache'den al
-   * @param {string} guildId - Sunucu ID'si
-   * @param {string} messageId - Mesaj ID'si
-   * @returns {object|null} - Mesaj verisi veya null
-   */
-  get(guildId, messageId) {
-    const key = `${guildId}:${messageId}`;
-    const data = this.cache.get(key);
-
-    if (!data) return null;
-
-    // Yaşı kontrol et (24 saatı geçtiyse sil)
-    if (Date.now() - data.timestamp > this.maxAgeMs) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    return data;
+  if (deleted > 0) {
+    console.log(`[CACHE_CLEANUP] ${deleted} eski mesaj silindi | Cache boyutu: ${msgCache.size}`);
   }
+}, 60 * 60 * 1000); // Saatte bir çalış
 
-  /**
-   * Eski ve geçerli olmayan mesajları temizle
-   */
-  cleanup() {
-    const now = Date.now();
-    let cleaned = 0;
+console.log('[MSG_CACHE] ✅ Global cache sistemi başlatıldı');
 
-    for (const [key, data] of this.cache.entries()) {
-      if (now - data.timestamp > this.maxAgeMs) {
-        this.cache.delete(key);
-        cleaned++;
-      }
+/**
+ * Mesajı cache'e ekle (messageCreate event'inde çağrılır)
+ * @param {Message} message - Discord mesajı
+ */
+function cacheMessage(message) {
+  if (!message?.id || !message?.author) return;
+
+  const msgData = {
+    id: message.id,
+    guildId: message.guildId,
+    channelId: message.channelId,
+    authorId: message.author.id,
+    authorTag: message.author.tag,
+    authorUsername: message.author.username,
+    authorAvatar: message.author.displayAvatarURL?.({ size: 256 }),
+    content: message.content || '(boş mesaj)',
+    attachments: message.attachments.size > 0 
+      ? Array.from(message.attachments.values()).map(att => ({
+          name: att.name,
+          size: att.size,
+          url: att.url,
+          contentType: att.contentType
+        }))
+      : [],
+    timestamp: Date.now(),
+    createdTimestamp: message.createdTimestamp
+  };
+
+  msgCache.set(message.id, msgData);
+  
+  // Cache boyutu 5000'i aşarsa, en eski mesajları temizle
+  if (msgCache.size > 5000) {
+    const entriesToDelete = msgCache.size - 5000;
+    const entries = Array.from(msgCache.entries());
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+    for (let i = 0; i < entriesToDelete; i++) {
+      msgCache.delete(entries[i][0]);
     }
-
-    if (cleaned > 0) {
-      console.log(`[MESSAGE_CACHE] Temizleme tamamlandı: ${cleaned} mesaj silindi`);
-    }
-
-    // Eğer hala çok fazla mesaj varsa, en eski olanları sil
-    if (this.cache.size > this.maxMessages) {
-      const toDelete = this.cache.size - this.maxMessages;
-      const keys = [...this.cache.keys()];
-      for (let i = 0; i < toDelete; i++) {
-        this.cache.delete(keys[i]);
-      }
-      console.log(`[MESSAGE_CACHE] Limit aşımı: ${toDelete} mesaj silindi`);
-    }
-  }
-
-  /**
-   * Cache istatistiklerini al
-   */
-  stats() {
-    return {
-      size: this.cache.size,
-      maxMessages: this.maxMessages,
-      maxAgeMs: this.maxAgeMs
-    };
-  }
-
-  /**
-   * Cache'i temizle
-   */
-  clear() {
-    this.cache.clear();
-  }
-
-  /**
-   * Cleanup interval'ı durdur
-   */
-  destroy() {
-    clearInterval(this.cleanupInterval);
   }
 }
 
-// Cache'i init et
-const messageCache = new MessageCache(5000, 24 * 60 * 60 * 1000);
+/**
+ * Mesajı cache'den al (messageDelete event'inde çağrılır)
+ * @param {string} messageId - Mesaj ID'si
+ * @returns {object|null} - Mesaj verisi veya null
+ */
+function getCachedMessage(messageId) {
+  const data = msgCache.get(messageId);
+  
+  if (!data) return null;
+  
+  // Yaşı kontrol et (24 saatı geçtiyse sil)
+  if (Date.now() - data.timestamp > MAX_CACHE_AGE) {
+    msgCache.delete(messageId);
+    return null;
+  }
+  
+  return data;
+}
 
 // Harita tutmak için
 const deletedMessages = new Map();
@@ -1251,7 +1209,9 @@ client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
     // ====== CUSTOM MESSAGE CACHE'E KAYDET ======
-    messageCache.set(message);
+    if (message.guild) {
+      cacheMessage(message);
+    }
 
     // ====== RATE LIMITING ======
     if (rateLimiter.isLimited(`msg_${message.author.id}`)) {
@@ -1579,18 +1539,22 @@ client.on('messageDelete', async (message) => {
     let authorId = message.author?.id;
     let authorTag = message.author?.tag;
     let authorUsername = message.author?.username;
-    let messageContent = message.partial ? null : message.content;
+    let authorAvatar = message.author?.displayAvatarURL?.({ size: 256 });
+    let messageContent = message.content;
     let attachments = message.attachments.size > 0 ? [...message.attachments.values()] : [];
 
-    // Eğer Discord'un cache'inde yoksa, custom cache'den al
-    if (!authorId || !authorTag) {
-      const cachedMessage = messageCache.get(message.guildId, message.id);
-      if (cachedMessage) {
-        authorId = cachedMessage.authorId;
-        authorTag = cachedMessage.authorTag;
-        authorUsername = cachedMessage.authorUsername;
-        messageContent = messageContent || cachedMessage.content;
-        attachments = cachedMessage.attachments || attachments;
+    // Eğer Discord'un cache'inde eksik veri varsa, custom cache'den al
+    if (!authorId || !authorTag || !messageContent) {
+      const cachedMsg = getCachedMessage(message.id);
+      if (cachedMsg) {
+        authorId = cachedMsg.authorId;
+        authorTag = cachedMsg.authorTag;
+        authorUsername = cachedMsg.authorUsername;
+        authorAvatar = cachedMsg.authorAvatar;
+        messageContent = messageContent || cachedMsg.content;
+        if (cachedMsg.attachments && cachedMsg.attachments.length > 0 && attachments.length === 0) {
+          attachments = cachedMsg.attachments;
+        }
       }
     }
 
@@ -1721,6 +1685,9 @@ client.on('messageDelete', async (message) => {
 
     // ===== LOGu GÖNDER =====
     await sendToChannel(client, cfg.logChannels.general, { embeds: [embed] });
+
+    // ===== CACHE'DEN TEMİZLE =====
+    msgCache.delete(message.id);
 
   } catch (error) {
     console.error('[MESSAGE_DELETE_LOG] Hata:', error);
