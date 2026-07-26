@@ -1535,172 +1535,26 @@ client.on('messageDelete', async (message) => {
   if (!isAllowedGuild(message.guild)) return;
 
   try {
-    // ===== MESAJ VERİLERİNİ AL (Discord cache veya Custom cache'den) =====
-    let authorId = message.author?.id;
-    let authorTag = message.author?.tag;
-    let authorUsername = message.author?.username;
-    let authorAvatar = message.author?.displayAvatarURL?.({ size: 256 });
-    let messageContent = message.content;
-    let attachments = message.attachments.size > 0 ? [...message.attachments.values()] : [];
+    // Mesaj verilerini al
+    const authorTag = message.author?.tag || '?';
+    const authorId = message.author?.id || '?';
+    const messageContent = message.content || '(içerik yok)';
+    const contentDisplay = safeTruncate(messageContent, 400);
 
-    // Eğer Discord'un cache'inde eksik veri varsa, custom cache'den al
-    if (!authorId || !authorTag || !messageContent) {
-      const cachedMsg = getCachedMessage(message.id);
-      if (cachedMsg) {
-        authorId = cachedMsg.authorId;
-        authorTag = cachedMsg.authorTag;
-        authorUsername = cachedMsg.authorUsername;
-        authorAvatar = cachedMsg.authorAvatar;
-        messageContent = messageContent || cachedMsg.content;
-        if (cachedMsg.attachments && cachedMsg.attachments.length > 0 && attachments.length === 0) {
-          attachments = cachedMsg.attachments;
-        }
-      }
-    }
+    // Embed basit ve temiz
+    const embed = baseEmbed('🗑️ Mesaj Silindi', 0xed4245)
+      .setDescription(
+        `📝 **İçerik:** ${contentDisplay}\n` +
+        `👤 **Yazar:** ${authorTag}\n` +
+        `📍 **Kanal:** <#${message.channelId}>`
+      )
+      .setThumbnail(message.author?.displayAvatarURL({ size: 256 }));
 
-    // Fallback: Eğer hala veri yoksa
-    if (!authorId) {
-      authorId = 'Bilinmiyor';
-      authorTag = 'Bilinmiyor Kullanıcı';
-      authorUsername = 'unknown';
-    }
-
-    // ===== AUDIT LOG'DAN SİLEN KİŞİYİ BUL =====
-    let deletedBy = 'Bot/Sistem';
-    let deletedById = 'Bilinmiyor';
-    let deletedByAvatar = null;
-
-    try {
-      const auditLogs = await message.guild.fetchAuditLogs({
-        limit: 5,
-        type: AuditLogEvent.MessageDelete
-      }).catch(() => null);
-
-      if (auditLogs?.entries?.size > 0) {
-        const entry = auditLogs.entries.first();
-        if (entry?.executor) {
-          deletedBy = `${entry.executor.tag}`;
-          deletedById = entry.executor.id;
-          deletedByAvatar = entry.executor.displayAvatarURL({ size: 256 });
-        }
-      }
-    } catch (err) {
-      console.error('[MESSAGE_DELETE_LOG] Audit log hatası:', err.message);
-    }
-
-    // ===== DISCORD ZAMANLANDıRMASı =====
-    const deleteTime = Math.floor(Date.now() / 1000);
-    const createdTime = message.createdTimestamp ? Math.floor(message.createdTimestamp / 1000) : deleteTime;
-    const timeAgoStr = `<t:${deleteTime}:R>`;
-    const fullTimeStr = `<t:${deleteTime}:F>`;
-
-    // ===== EKLERI FORMATLA =====
-    let attachmentText = 'Ek yok';
-    if (attachments && attachments.length > 0) {
-      attachmentText = attachments
-        .map(att => `• **${att.name || 'Dosya'}** (${Math.round(att.size / 1024)}KB)`)
-        .join('\n');
-    }
-
-    // ===== MESAJ İÇERİĞİ =====
-    const contentDisplay = messageContent && messageContent !== '(boş mesaj)'
-      ? safeTruncate(messageContent, 800)
-      : '*(mesaj içeriği alınamadı)*';
-
-    // ===== PROFESYONEL EMBED OLUŞTUR =====
-    const embed = baseEmbed('🗑️ MESAJ SİLİNDİ', 0xed4245);
-
-    embed.setDescription(
-      `📝 **Silinen Mesaj İçeriği:**\n\`\`\`\n${contentDisplay}\n\`\`\``
-    );
-
-    // Yazar Bilgisi
-    embed.addFields({
-      name: '👤 Mesajı Yazan Kişi',
-      value:
-        `• **Kullanıcı:** ${authorTag}\n` +
-        `• **ID:** \`${authorId}\`\n` +
-        `• **Etiket:** <@${authorId}>\n` +
-        `• **Gönderme Zamanı:** ${createdTime !== deleteTime ? `<t:${createdTime}:F>` : 'Bilinmiyor'}`,
-      inline: false
-    });
-
-    // Silen Bilgisi
-    embed.addFields({
-      name: '⚙️ Mesajı Silen Kişi',
-      value:
-        `• **Moderatör:** ${deletedBy}\n` +
-        `• **ID:** \`${deletedById}\`\n` +
-        `• **Etiket:** <@${deletedById}>\n` +
-        `• **Silinme Zamanı:** ${fullTimeStr}`,
-      inline: false
-    });
-
-    // Kanal Bilgisi
-    embed.addFields({
-      name: '📍 Kanal Bilgisi',
-      value:
-        `• **Kanal:** <#${message.channelId}>\n` +
-        `• **Kanal ID:** \`${message.channelId}\`\n` +
-        `• **Sunucu:** \`${message.guild.name}\``,
-      inline: false
-    });
-
-    // Ekleri göster
-    embed.addFields({
-      name: '📎 Ekler',
-      value: attachmentText,
-      inline: false
-    });
-
-    // Metadata
-    embed.addFields({
-      name: '📊 Mesaj Metadata',
-      value:
-        `• **Mesaj ID:** \`${message.id}\`\n` +
-        `• **Silinme Saati:** ${fullTimeStr}\n` +
-        `• **Cache Durumu:** ${authorId === 'Bilinmiyor' ? '❌ Bellekten' : '✅ Discord Cache'}`,
-      inline: false
-    });
-
-    // Yazar Avatar (başlıkta)
-    if (message.author?.displayAvatarURL) {
-      embed.setAuthor({
-        name: authorTag,
-        iconURL: message.author.displayAvatarURL({ size: 256 }),
-        url: null
-      });
-    }
-
-    // Silen kişi Thumbnail
-    if (deletedByAvatar) {
-      embed.setThumbnail(deletedByAvatar);
-    }
-
-    // Footer
-    embed.setFooter({
-      text: `🗑️ Mesaj Denetim Sistemi • ${message.guild.name}`,
-      iconURL: client.user?.displayAvatarURL()
-    });
-
-    // ===== LOGu GÖNDER =====
     await sendToChannel(client, cfg.logChannels.general, { embeds: [embed] });
-
-    // ===== CACHE'DEN TEMİZLE =====
     msgCache.delete(message.id);
 
   } catch (error) {
-    console.error('[MESSAGE_DELETE_LOG] Hata:', error);
-    await logError({
-      client,
-      cfg,
-      error,
-      context: 'Message Delete Handler',
-      additionalData: {
-        'Mesaj ID': message.id,
-        'Kanal ID': message.channelId
-      }
-    });
+    console.error('[MESSAGE_DELETE] Hata:', error.message);
   }
 });
 
