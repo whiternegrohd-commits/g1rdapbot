@@ -83,7 +83,133 @@ const errorHandler = new ErrorHandler(cfg.logChannels?.botInternal);
 const requestDedup = new RequestDeduplicator(5000); // 5 sec dedup window
 const healthCheck = new HealthCheck();
 
-// Map'leri memory manager'a kaydet
+// ═══════════════════════════════════════════════════════════════════
+// 💾 CUSTOM MESSAGE CACHE SISTEMI (24 saat + 5000 mesaj limiti)
+// ═══════════════════════════════════════════════════════════════════
+
+class MessageCache {
+  constructor(maxMessages = 5000, maxAgeMs = 24 * 60 * 60 * 1000) {
+    this.cache = new Map();
+    this.maxMessages = maxMessages;
+    this.maxAgeMs = maxAgeMs;
+    this.cleanupInterval = setInterval(() => this.cleanup(), 60 * 60 * 1000); // Saatte bir temizle
+  }
+
+  /**
+   * Mesajı cache'e ekle
+   * @param {Message} message - Discord mesajı
+   */
+  set(message) {
+    if (!message?.id || !message?.author) return;
+
+    const key = `${message.guildId}:${message.id}`;
+    const data = {
+      id: message.id,
+      guildId: message.guildId,
+      channelId: message.channelId,
+      authorId: message.author.id,
+      authorTag: message.author.tag || `${message.author.username}#${message.author.discriminator || '0'}`,
+      authorUsername: message.author.username,
+      content: message.content || '(boş mesaj)',
+      attachments: message.attachments.map(att => ({
+        name: att.name,
+        size: att.size,
+        url: att.url,
+        contentType: att.contentType
+      })),
+      timestamp: Date.now(),
+      createdTimestamp: message.createdTimestamp
+    };
+
+    this.cache.set(key, data);
+    
+    // Max mesaj sayısını aş ıysa eski olanı sil
+    if (this.cache.size > this.maxMessages) {
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
+    }
+  }
+
+  /**
+   * Mesajı cache'den al
+   * @param {string} guildId - Sunucu ID'si
+   * @param {string} messageId - Mesaj ID'si
+   * @returns {object|null} - Mesaj verisi veya null
+   */
+  get(guildId, messageId) {
+    const key = `${guildId}:${messageId}`;
+    const data = this.cache.get(key);
+
+    if (!data) return null;
+
+    // Yaşı kontrol et (24 saatı geçtiyse sil)
+    if (Date.now() - data.timestamp > this.maxAgeMs) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return data;
+  }
+
+  /**
+   * Eski ve geçerli olmayan mesajları temizle
+   */
+  cleanup() {
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const [key, data] of this.cache.entries()) {
+      if (now - data.timestamp > this.maxAgeMs) {
+        this.cache.delete(key);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      console.log(`[MESSAGE_CACHE] Temizleme tamamlandı: ${cleaned} mesaj silindi`);
+    }
+
+    // Eğer hala çok fazla mesaj varsa, en eski olanları sil
+    if (this.cache.size > this.maxMessages) {
+      const toDelete = this.cache.size - this.maxMessages;
+      const keys = [...this.cache.keys()];
+      for (let i = 0; i < toDelete; i++) {
+        this.cache.delete(keys[i]);
+      }
+      console.log(`[MESSAGE_CACHE] Limit aşımı: ${toDelete} mesaj silindi`);
+    }
+  }
+
+  /**
+   * Cache istatistiklerini al
+   */
+  stats() {
+    return {
+      size: this.cache.size,
+      maxMessages: this.maxMessages,
+      maxAgeMs: this.maxAgeMs
+    };
+  }
+
+  /**
+   * Cache'i temizle
+   */
+  clear() {
+    this.cache.clear();
+  }
+
+  /**
+   * Cleanup interval'ı durdur
+   */
+  destroy() {
+    clearInterval(this.cleanupInterval);
+  }
+}
+
+// Cache'i init et
+const messageCache = new MessageCache(5000, 24 * 60 * 60 * 1000);
+
+// Harita tutmak için
 const deletedMessages = new Map();
 global.deletedMessages = deletedMessages;
 
@@ -117,10 +243,14 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.GuildVoiceStates
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User],
-  // Production settings
+  partials: [
+    Partials.Message,
+    Partials.Channel,
+    Partials.GuildMember,
+    Partials.User,
+    Partials.Reaction
+  ],
   allowedMentions: { parse: ['users'] },
-  intents: 129023, // All intents except some dangerous ones
   retryLimit: 3
 });
 
@@ -1120,6 +1250,9 @@ client.on('messageCreate', async (message) => {
     if (message.guild && !isAllowedGuild(message.guild)) return;
     if (message.author.bot) return;
 
+    // ====== CUSTOM MESSAGE CACHE'E KAYDET ======
+    messageCache.set(message);
+
     // ====== RATE LIMITING ======
     if (rateLimiter.isLimited(`msg_${message.author.id}`)) {
       console.warn(`[RATELIMIT] ${message.author.id} çok hızlı mesaj gönderiyor`);
@@ -1434,44 +1567,51 @@ client.on('userUpdate', async (oldUser, newUser) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// 🗑️ MESAJ SİLİNDİ LOG SISTEMI (Ultra Detaylı)
+// 🗑️ MESAJ SİLİNDİ LOG SISTEMI (Custom Cache + Audit Log)
 // ═══════════════════════════════════════════════════════════════════
 
 client.on('messageDelete', async (message) => {
   if (!message.guild) return;
   if (!isAllowedGuild(message.guild)) return;
-  if (message.author?.bot) return;
 
   try {
-    // ===== MESAJ VERİLERİNİ AL =====
-    const messageId = message.id;
-    const guildId = message.guildId;
-    const channelId = message.channelId;
-    const createdTimestamp = message.createdTimestamp;
-    
-    // İçerik ve yazar bilgisi
-    let authorId = message.author?.id || 'Bilinmiyor';
-    let authorTag = message.author?.tag || 'Bilinmiyor Kullanıcı';
-    let authorAvatar = message.author?.displayAvatarURL({ size: 256 }) || null;
-    const messageContent = message.partial ? '(mesaj bellekte yok)' : (message.content || '(boş mesaj)');
-    const contentTruncated = safeTruncate(messageContent, 800);
+    // ===== MESAJ VERİLERİNİ AL (Discord cache veya Custom cache'den) =====
+    let authorId = message.author?.id;
+    let authorTag = message.author?.tag;
+    let authorUsername = message.author?.username;
+    let messageContent = message.partial ? null : message.content;
+    let attachments = message.attachments.size > 0 ? [...message.attachments.values()] : [];
 
-    // Ekleri al (varsa)
-    const attachments = message.attachments.size > 0 
-      ? message.attachments.map(att => `[${att.name || 'Dosya'} - ${att.size} byte]`).join('\n')
-      : 'Ek yok';
+    // Eğer Discord'un cache'inde yoksa, custom cache'den al
+    if (!authorId || !authorTag) {
+      const cachedMessage = messageCache.get(message.guildId, message.id);
+      if (cachedMessage) {
+        authorId = cachedMessage.authorId;
+        authorTag = cachedMessage.authorTag;
+        authorUsername = cachedMessage.authorUsername;
+        messageContent = messageContent || cachedMessage.content;
+        attachments = cachedMessage.attachments || attachments;
+      }
+    }
+
+    // Fallback: Eğer hala veri yoksa
+    if (!authorId) {
+      authorId = 'Bilinmiyor';
+      authorTag = 'Bilinmiyor Kullanıcı';
+      authorUsername = 'unknown';
+    }
 
     // ===== AUDIT LOG'DAN SİLEN KİŞİYİ BUL =====
     let deletedBy = 'Bot/Sistem';
     let deletedById = 'Bilinmiyor';
     let deletedByAvatar = null;
-    
+
     try {
-      const auditLogs = await message.guild.fetchAuditLogs({ 
-        limit: 5, 
-        type: AuditLogEvent.MessageDelete 
+      const auditLogs = await message.guild.fetchAuditLogs({
+        limit: 5,
+        type: AuditLogEvent.MessageDelete
       }).catch(() => null);
-      
+
       if (auditLogs?.entries?.size > 0) {
         const entry = auditLogs.entries.first();
         if (entry?.executor) {
@@ -1486,26 +1626,38 @@ client.on('messageDelete', async (message) => {
 
     // ===== DISCORD ZAMANLANDıRMASı =====
     const deleteTime = Math.floor(Date.now() / 1000);
-    const createdTime = Math.floor(createdTimestamp / 1000);
-    const timeAgoStr = `<t:${deleteTime}:R>`; // "1 saat önce" gibi
-    const fullTimeStr = `<t:${deleteTime}:F>`; // "26 Temmuz 2026 14:30:45" gibi
+    const createdTime = message.createdTimestamp ? Math.floor(message.createdTimestamp / 1000) : deleteTime;
+    const timeAgoStr = `<t:${deleteTime}:R>`;
+    const fullTimeStr = `<t:${deleteTime}:F>`;
+
+    // ===== EKLERI FORMATLA =====
+    let attachmentText = 'Ek yok';
+    if (attachments && attachments.length > 0) {
+      attachmentText = attachments
+        .map(att => `• **${att.name || 'Dosya'}** (${Math.round(att.size / 1024)}KB)`)
+        .join('\n');
+    }
+
+    // ===== MESAJ İÇERİĞİ =====
+    const contentDisplay = messageContent && messageContent !== '(boş mesaj)'
+      ? safeTruncate(messageContent, 800)
+      : '*(mesaj içeriği alınamadı)*';
 
     // ===== PROFESYONEL EMBED OLUŞTUR =====
     const embed = baseEmbed('🗑️ MESAJ SİLİNDİ', 0xed4245);
 
-    // Açıklama
     embed.setDescription(
-      `📝 **Silinen Mesaj İçeriği:**\n\`\`\`\n${contentTruncated}\n\`\`\``
+      `📝 **Silinen Mesaj İçeriği:**\n\`\`\`\n${contentDisplay}\n\`\`\``
     );
 
     // Yazar Bilgisi
     embed.addFields({
       name: '👤 Mesajı Yazan Kişi',
-      value: 
+      value:
         `• **Kullanıcı:** ${authorTag}\n` +
         `• **ID:** \`${authorId}\`\n` +
         `• **Etiket:** <@${authorId}>\n` +
-        `• **Gönderildi:** ${timeAgoStr} (${fullTimeStr})`,
+        `• **Gönderme Zamanı:** ${createdTime !== deleteTime ? `<t:${createdTime}:F>` : 'Bilinmiyor'}`,
       inline: false
     });
 
@@ -1524,36 +1676,34 @@ client.on('messageDelete', async (message) => {
     embed.addFields({
       name: '📍 Kanal Bilgisi',
       value:
-        `• **Kanal:** <#${channelId}>\n` +
-        `• **Kanal ID:** \`${channelId}\`\n` +
+        `• **Kanal:** <#${message.channelId}>\n` +
+        `• **Kanal ID:** \`${message.channelId}\`\n` +
         `• **Sunucu:** \`${message.guild.name}\``,
       inline: false
     });
 
-    // Ekleri göster (varsa)
-    if (message.attachments.size > 0) {
-      embed.addFields({
-        name: '📎 Ekler',
-        value: attachments,
-        inline: false
-      });
-    }
+    // Ekleri göster
+    embed.addFields({
+      name: '📎 Ekler',
+      value: attachmentText,
+      inline: false
+    });
 
     // Metadata
     embed.addFields({
       name: '📊 Mesaj Metadata',
       value:
-        `• **Mesaj ID:** \`${messageId}\`\n` +
-        `• **Gönderme Saati:** <t:${createdTime}:F>\n` +
-        `• **Silinme Saati:** <t:${deleteTime}:F>`,
+        `• **Mesaj ID:** \`${message.id}\`\n` +
+        `• **Silinme Saati:** ${fullTimeStr}\n` +
+        `• **Cache Durumu:** ${authorId === 'Bilinmiyor' ? '❌ Bellekten' : '✅ Discord Cache'}`,
       inline: false
     });
 
     // Yazar Avatar (başlıkta)
-    if (authorAvatar) {
+    if (message.author?.displayAvatarURL) {
       embed.setAuthor({
         name: authorTag,
-        iconURL: authorAvatar,
+        iconURL: message.author.displayAvatarURL({ size: 256 }),
         url: null
       });
     }
@@ -1565,23 +1715,12 @@ client.on('messageDelete', async (message) => {
 
     // Footer
     embed.setFooter({
-      text: `🗑️ Mesaj Denetim Sistemi • Sunucu: ${message.guild.name}`,
+      text: `🗑️ Mesaj Denetim Sistemi • ${message.guild.name}`,
       iconURL: client.user?.displayAvatarURL()
     });
 
     // ===== LOGu GÖNDER =====
     await sendToChannel(client, cfg.logChannels.general, { embeds: [embed] });
-
-    // ===== CACHE'E KAYDET =====
-    const key = `${guildId}:${channelId}`;
-    deletedMessages.set(key, {
-      id: messageId,
-      author: message.author,
-      content: messageContent,
-      attachments: [...message.attachments.values()],
-      at: Date.now(),
-      deletedBy: deletedBy
-    });
 
   } catch (error) {
     console.error('[MESSAGE_DELETE_LOG] Hata:', error);
