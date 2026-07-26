@@ -1447,64 +1447,71 @@ client.on('messageDelete', async (message) => {
     at: Date.now()
   });
 
-  const content = message.partial ? '(mesaj cache yok)' : (message.content || '(boş)');
-  const author = message.author ? `${message.author.tag} (\`${message.author.id}\`)` : '(bilinmiyor)';
-  const contentTruncated = safeTruncate(content, 500);
+  // Mesaj verilerini güvenli al
+  const messageContent = message.partial ? '(mesaj cache yok)' : (message.content || '(boş)');
+  const authorId = message.author?.id || 'Bilinmeyen';
+  const authorTag = message.author?.tag || 'Bilinmeyen Kullanıcı';
+  const authorAvatar = message.author?.displayAvatarURL({ size: 256 }) || null;
+  const contentTruncated = safeTruncate(messageContent, 500);
   
   // Kimin sildiğini bul (audit log)
-  let deletedBy = 'Bot/Bilinmeyen';
+  let deletedBy = '⚠️ Bot/Sistem';
   try {
     const logs = await message.guild.fetchAuditLogs({ limit: 5, type: 72 }).catch(() => null);
-    const entry = logs?.entries?.find(e => e.targetId === message.author?.id && Date.now() - e.createdTimestamp < 5000);
-    if (entry && entry.executor) {
+    const entry = logs?.entries?.find(e => 
+      e.targetId === message.author?.id && 
+      Date.now() - e.createdTimestamp < 5000
+    );
+    if (entry?.executor) {
       deletedBy = `${entry.executor.tag} (\`${entry.executor.id}\`)`;
     }
   } catch {}
 
   // 🗑️ MESAJ SİLİNDİ LOGU
-  await sendToChannel(client, cfg.logChannels.general, {
-    embeds: [
-      baseEmbed('🗑️ MESAJ SİLİNDİ', 0xed4245)
-        .setDescription(
-          `📝 **Mesaj İçeriği:**\n\`\`\`\n${contentTruncated}\n\`\`\``
-        )
-        .addFields(
-          {
-            name: '👤 Yazar Bilgisi',
-            value:
-              `• **İsim:** ${author}\n` +
-              `• **Hesap Yaşı:** \`${formatDuration(Date.now() - message.author?.createdTimestamp)}\``,
-            inline: true
-          },
-          {
-            name: '🗑️ Silme Bilgisi',
-            value:
-              `• **Silen:** ${deletedBy}\n` +
-              `• **Zaman:** \`${getFormattedTime()}\``,
-            inline: true
-          },
-          {
-            name: '📍 Kanal Bilgisi',
-            value:
-              `• **Kanal:** <#${message.channelId}>\n` +
-              `• **Kanal ID:** \`${message.channelId}\``,
-            inline: false
-          },
-          {
-            name: '📊 Mesaj Metadata',
-            value:
-              `• **Mesaj ID:** \`${message.id}\`\n` +
-              `• **Gönderme Zamanı:** \`${new Date(message.createdTimestamp).toLocaleString('tr-TR')}\``,
-            inline: false
-          }
-        )
-        .setThumbnail(message.author?.displayAvatarURL({ size: 256 }))
-        .setFooter({
-          text: `━ Mesaj Denetim Sistemi • ${getFullTimestamp()}`,
-          iconURL: client.user?.displayAvatarURL()
-        })
-    ]
-  });
+  const embed = baseEmbed('🗑️ MESAJ SİLİNDİ', 0xed4245)
+    .setDescription(
+      `📝 **Mesaj İçeriği:**\n\`\`\`\n${contentTruncated}\n\`\`\``
+    )
+    .addFields(
+      {
+        name: '👤 Yazar Bilgisi',
+        value:
+          `• **İsim:** ${authorTag}\n` +
+          `• **ID:** \`${authorId}\`${message.author?.createdTimestamp ? `\n• **Hesap Yaşı:** \`${formatDuration(Date.now() - message.author.createdTimestamp)}\`` : ''}`,
+        inline: true
+      },
+      {
+        name: '🗑️ Silme Bilgisi',
+        value:
+          `• **Silen:** ${deletedBy}\n` +
+          `• **Zaman:** \`${getFormattedTime()}\``,
+        inline: true
+      },
+      {
+        name: '📍 Kanal Bilgisi',
+        value:
+          `• **Kanal:** <#${message.channelId}>\n` +
+          `• **Kanal ID:** \`${message.channelId}\``,
+        inline: false
+      },
+      {
+        name: '📊 Mesaj Metadata',
+        value:
+          `• **Mesaj ID:** \`${message.id}\`\n` +
+          `• **Gönderme Zamanı:** \`${message.createdTimestamp ? new Date(message.createdTimestamp).toLocaleString('tr-TR') : 'Bilinmiyor'}\``,
+        inline: false
+      }
+    )
+    .setFooter({
+      text: `━ Mesaj Denetim Sistemi • ${getFullTimestamp()}`,
+      iconURL: client.user?.displayAvatarURL()
+    });
+
+  if (authorAvatar) {
+    embed.setThumbnail(authorAvatar);
+  }
+
+  await sendToChannel(client, cfg.logChannels.general, { embeds: [embed] });
 });
 
 // Mesaj edit logu
