@@ -1448,14 +1448,25 @@ client.on('messageDelete', async (message) => {
   });
 
   const content = message.partial ? '(mesaj cache yok)' : (message.content || '(boş)');
-  const author = message.author ? `${message.author.tag} (\`${message.author.id}\`)` : '(bilinmiyor)';
+  let author = message.author ? `${message.author.tag} (\`${message.author.id}\`)` : '(bilinmiyor)';
   const contentTruncated = safeTruncate(content, 500);
+  
+  // Eğer author null ise, audit log'dan bul
+  if (!message.author) {
+    try {
+      const logs = await message.guild.fetchAuditLogs({ limit: 10, type: AuditLogEvent.MessageDelete }).catch(() => null);
+      const entry = logs?.entries?.find(e => Date.now() - e.createdTimestamp < 5000);
+      if (entry?.targetId) {
+        author = `${entry.targetId} (cache yok)`;
+      }
+    } catch {}
+  }
   
   // Kimin sildiğini bul (audit log)
   let deletedBy = 'Bot/Bilinmeyen';
   try {
-    const logs = await message.guild.fetchAuditLogs({ limit: 5, type: 72 }).catch(() => null);
-    const entry = logs?.entries?.find(e => e.targetId === message.author?.id && Date.now() - e.createdTimestamp < 5000);
+    const logs = await message.guild.fetchAuditLogs({ limit: 5, type: AuditLogEvent.MessageDelete }).catch(() => null);
+    const entry = logs?.entries?.find(e => Date.now() - e.createdTimestamp < 5000);
     if (entry && entry.executor) {
       deletedBy = `${entry.executor.tag} (\`${entry.executor.id}\`)`;
     }
