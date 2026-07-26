@@ -769,17 +769,38 @@ client.on('interactionCreate', async (interaction) => {
       ephemeral: true
     });
 
-    // Detaylı timeout logu
+    // ⏱️ TIMEOUT LOGU
     await sendToChannel(client, cfg.logChannels.general, {
       embeds: [
-        baseEmbed('⏱️ Timeout Verildi', 0xff9900)
+        baseEmbed('⏱️ TIMEOUT VERİLDİ', 0xff9900)
           .setDescription(
-            `**Hedef:** ${member.user.tag} (\`${targetId}\`)\n` +
-            `**Mod:** ${modInfo}\n` +
-            `**Süre:** ${mins} dakika\n` +
-            `**Sebep:** ${reason}\n` +
-            `**Zamanı:** ${new Date().toLocaleString('tr-TR')}`
+            `👤 **Hedef:** ${member.user.tag} (\`${targetId}\`)\n` +
+            `⚙️ **Moderatör:** ${modInfo}\n` +
+            `⏰ **Süre:** \`${mins} dakika\`\n` +
+            `📝 **Sebep:** ${reason}\n` +
+            `📅 **Zaman:** \`${getFullTimestamp()}\``
           )
+          .addFields(
+            {
+              name: '👤 Hedef Bilgisi',
+              value: 
+                `• **Hesap Yaşı:** \`${formatDuration(Date.now() - member.user.createdTimestamp)}\`\n` +
+                `• **Sunucuya Katılış:** \`${new Date(member.joinedTimestamp).toLocaleDateString('tr-TR')}\``,
+              inline: true
+            },
+            {
+              name: '📊 Timeout Detayları',
+              value:
+                `• **Bitiş Saati:** \`${new Date(Date.now() + mins * 60 * 1000).toLocaleTimeString('tr-TR')}\`\n` +
+                `• **Durum:** \`Aktif\``,
+              inline: true
+            }
+          )
+          .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+          .setFooter({
+            text: `━ Moderasyon Sistemi • ${getFullTimestamp()}`,
+            iconURL: client.user?.displayAvatarURL()
+          })
       ]
     });
 
@@ -834,16 +855,39 @@ client.on('interactionCreate', async (interaction) => {
       ephemeral: true
     });
 
-    // Detaylı ban logu
+    // 🚫 BAN LOGU
     await sendToChannel(client, cfg.logChannels.general, {
       embeds: [
-        baseEmbed('🚫 Üye Banlandı', 0xff0000)
+        baseEmbed('🚫 ÜYE BANL ANDI', 0xff0000)
           .setDescription(
-            `**Hedef:** ${member.user.tag} (\`${targetId}\`)\n` +
-            `**Mod:** ${modInfo}\n` +
-            `**Sebep:** ${reason}\n` +
-            `**Zamanı:** ${new Date().toLocaleString('tr-TR')}`
+            `👤 **Hedef:** ${member.user.tag} (\`${targetId}\`)\n` +
+            `⚙️ **Moderatör:** ${modInfo}\n` +
+            `📝 **Sebep:** ${reason}\n` +
+            `📅 **Zaman:** \`${getFullTimestamp()}\``
           )
+          .addFields(
+            {
+              name: '👤 Hedef Bilgisi',
+              value:
+                `• **Hesap Yaşı:** \`${formatDuration(Date.now() - member.user.createdTimestamp)}\`\n` +
+                `• **Sunucuya Katılış:** \`${new Date(member.joinedTimestamp).toLocaleDateString('tr-TR')}\`\n` +
+                `• **Roller:** \`${member.roles.cache.size - 1}\``,
+              inline: true
+            },
+            {
+              name: '⚙️ Ban Detayları',
+              value:
+                `• **Ban Türü:** \`Kalıcı\`\n` +
+                `• **Durum:** \`Aktif\`\n` +
+                `• **Mesaj Sil:** \`0 gün\``,
+              inline: true
+            }
+          )
+          .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+          .setFooter({
+            text: `━ Moderasyon Sistemi • ${getFullTimestamp()}`,
+            iconURL: client.user?.displayAvatarURL()
+          })
       ]
     });
 
@@ -899,16 +943,39 @@ client.on('interactionCreate', async (interaction) => {
       ephemeral: true
     });
 
-    // Detaylı kick logu
+    // 👢 KICK LOGU
     await sendToChannel(client, cfg.logChannels.general, {
       embeds: [
-        baseEmbed('👢 Üye Kicklendi', 0xffa500)
+        baseEmbed('👢 ÜYE KICKLENDİ', 0xffa500)
           .setDescription(
-            `**Hedef:** ${member.user.tag} (\`${targetId}\`)\n` +
-            `**Mod:** ${modInfo}\n` +
-            `**Sebep:** ${reason}\n` +
-            `**Zamanı:** ${new Date().toLocaleString('tr-TR')}`
+            `👤 **Hedef:** ${member.user.tag} (\`${targetId}\`)\n` +
+            `⚙️ **Moderatör:** ${modInfo}\n` +
+            `📝 **Sebep:** ${reason}\n` +
+            `📅 **Zaman:** \`${getFullTimestamp()}\``
           )
+          .addFields(
+            {
+              name: '👤 Hedef Bilgisi',
+              value:
+                `• **Hesap Yaşı:** \`${formatDuration(Date.now() - member.user.createdTimestamp)}\`\n` +
+                `• **Sunucuya Katılış:** \`${new Date(member.joinedTimestamp).toLocaleDateString('tr-TR')}\`\n` +
+                `• **Roller:** \`${member.roles.cache.size - 1}\``,
+              inline: true
+            },
+            {
+              name: '⚙️ Kick Detayları',
+              value:
+                `• **Kick Türü:** \`Moderatör İşlemi\`\n` +
+                `• **Durum:** \`Tamamlandı\`\n` +
+                `• **Mesaj Koruma:** \`Yok\``,
+              inline: true
+            }
+          )
+          .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+          .setFooter({
+            text: `━ Moderasyon Sistemi • ${getFullTimestamp()}`,
+            iconURL: client.user?.displayAvatarURL()
+          })
       ]
     });
 
@@ -1105,13 +1172,30 @@ client.on('guildMemberAdd', async (member) => {
         
         await sendToChannel(client, cfg.logChannels.guard, {
           embeds: [
-            baseEmbed('🚫 Bot Ekleme Engellendi', 0xff0000)
+            baseEmbed('🚫 BOT EKLEME ENGELLEND İ', 0xff0000)
               .setDescription(
-                `**Bot:** ${member.user.tag} (\`${member.id}\`)\n` +
-                `**Ekleyen:** ${adderInfo}\n` +
-                `**Aksiyon:** Bot sunucudan çıkarıldı\n` +
-                `**Sebep:** Sadece sunucu sahibi veya Full Admin bot ekleyebilir`
+                `🤖 **Bot:** ${member.user.tag} (\`${member.id}\`)\n` +
+                `👤 **Ekleyen:** ${adderInfo}\n` +
+                `⚙️ **Aksiyon:** Bot sunucudan çıkarıldı\n` +
+                `📝 **Sebep:** Sadece sunucu sahibi veya Full Admin bot ekleyebilir\n` +
+                `📅 **Zaman:** \`${getFullTimestamp()}\``
               )
+              .addFields(
+                {
+                  name: '🤖 Bot Bilgisi',
+                  value: `• **Bot ID:** \`${member.id}\`\n• **Bot Sahibi:** \`Bilinmiyor\``,
+                  inline: true
+                },
+                {
+                  name: '🛡️ Güvenlik Detayları',
+                  value: `• **Tehdit Seviyesi:** \`Yüksek\`\n• **Durum:** \`Bloklanmış\``,
+                  inline: true
+                }
+              )
+              .setFooter({
+                text: `━ Güvenlik Sistemi • ${getFullTimestamp()}`,
+                iconURL: client.user?.displayAvatarURL()
+              })
           ]
         });
       }
@@ -1150,18 +1234,40 @@ client.on('guildMemberAdd', async (member) => {
   
   const riskText = riskFlags.length > 0 ? riskFlags.join(', ') : 'Uygun görünüyor';
 
+  // 👋 ÜYE GİRİŞİ LOGU
   await sendToChannel(client, cfg.logChannels.welcome, {
     embeds: [
-      baseEmbed('Üye giriş yaptı', 0x57f287)
-        .setDescription(`${member} (\`${member.id}\`) sunucuya katıldı.`)
-        .addFields(
-          { name: 'Hesap Bilgisi', value: `${member.user.tag}`, inline: false },
-          { name: 'Hesap Yaşı', value: `${accountAgeDays} gün eski`, inline: true },
-          { name: 'Avatar', value: hasAvatar ? '✅ Var' : '❌ Yok', inline: true },
-          { name: 'Tür', value: isBot ? '🤖 Bot' : '👤 İnsan', inline: true },
-          { name: 'Risk Seviyesi', value: `${riskLevel}`, inline: true },
-          { name: 'Uyarılar', value: riskText, inline: true }
+      baseEmbed('👋 ÜYE GİRİŞ YAPTI', 0x57f287)
+        .setDescription(
+          `👤 **Üye:** ${member} (\`${member.id}\`)\n` +
+          `📝 **Kullanıcı Adı:** ${member.user.tag}\n` +
+          `📅 **Sunucuya Katılış:** \`${getFormattedTime()}\`\n` +
+          `🌍 **Saat Dilimi:** \`UTC+3\``
         )
+        .addFields(
+          {
+            name: '📋 Hesap Bilgisi',
+            value:
+              `• **Hesap Yaşı:** \`${accountAgeDays} gün\`\n` +
+              `• **Oluşturulma:** \`${new Date(member.user.createdTimestamp).toLocaleDateString('tr-TR')}\`\n` +
+              `• **Avatar:** ${hasAvatar ? '✅ Var' : '❌ Yok'}\n` +
+              `• **Tür:** ${isBot ? '🤖 Bot' : '👤 İnsan'}`,
+            inline: false
+          },
+          {
+            name: '🛡️ Güvenlik Analizi',
+            value:
+              `• **Risk Seviyesi:** ${riskLevel}\n` +
+              `• **Uyarılar:** ${riskText}\n` +
+              `• **İzin Durumu:** ✅ Onaylı`,
+            inline: false
+          }
+        )
+        .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+        .setFooter({
+          text: `━ Hoşgeldin Sistemi • ${getFullTimestamp()}`,
+          iconURL: client.user?.displayAvatarURL()
+        })
     ]
   });
 });
@@ -1203,47 +1309,121 @@ client.on('guildMemberRemove', async (member) => {
     .map(r => `<@&${r.id}>`)
     .join(', ') || 'Rol yok';
 
+  // 👋 ÜYE AYRILIŞ LOGU
   await sendToChannel(client, cfg.logChannels.quit, {
     embeds: [
-      baseEmbed('Üye ayrıldı', 0xed4245)
-        .setDescription(`${member.user?.tag ?? 'Bilinmeyen'} (\`${member.id}\`) sunucudan ayrıldı.`)
-        .addFields(
-          { name: 'Ayrılış Bilgisi', value: `${leaveReason}\n${leaveReasonDetail}`, inline: false },
-          { name: 'Sunucuda Kalış', value: `${membershipDays} gün${membershipHours > 0 ? ` (${membershipHours} saat)` : ''}`, inline: true },
-          { name: 'Toplam Mesaj', value: `💬 ${userMsg} mesaj`, inline: true },
-          { name: 'Toplam Ses', value: `🔊 ${voiceHours} saat`, inline: true },
-          { name: 'Sahip Olduğu Roller', value: roles, inline: false }
+      baseEmbed('👋 ÜYE AYRILIŞ YAPTI', 0xed4245)
+        .setDescription(
+          `👤 **Üye:** ${member.user?.tag ?? 'Bilinmeyen'} (\`${member.id}\`)\n` +
+          `📝 **Sebep:** ${leaveReason} - ${leaveReasonDetail}\n` +
+          `📅 **Ayrılış Zamanı:** \`${getFormattedTime()}\``
         )
+        .addFields(
+          {
+            name: '📊 Sunucuda Geçirilen Süre',
+            value:
+              `• **Toplam Gün:** \`${membershipDays}\`\n` +
+              `• **Saatler:** \`${membershipHours}\`\n` +
+              `• **Katılış:** \`${new Date(joinedAt).toLocaleDateString('tr-TR')}\``,
+            inline: true
+          },
+          {
+            name: '📈 Aktivite İstatistikleri',
+            value:
+              `• **Mesaj:** \`${userMsg}\` 💬\n` +
+              `• **Ses Saati:** \`${voiceHours}s\` 🔊\n` +
+              `• **Roller:** \`${member.roles.cache.size - 1}\``,
+            inline: true
+          },
+          {
+            name: '🎖️ Sahip Olduğu Roller',
+            value: roles || 'Rol yok',
+            inline: false
+          }
+        )
+        .setThumbnail(member.user?.displayAvatarURL({ size: 256 }))
+        .setFooter({
+          text: `━ Ayrılış Sistemi • ${getFullTimestamp()}`,
+          iconURL: client.user?.displayAvatarURL()
+        })
     ]
   });
 });
 
-// Tag rol kontrolü (nickname vb. değişince) + Yetki / rol değişimi logu
-// Yetki / rol değişimi logu (guildMemberUpdate)
+// 🔄 ROL / YETKİ GÜNCELLEMESI (guildMemberUpdate)
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
   if (!isAllowedGuild(newMember.guild)) return;
+  
   const oldRoles = new Set(oldMember.roles.cache.keys());
   const newRoles = new Set(newMember.roles.cache.keys());
 
-  const added = [...newRoles].filter((r) => !oldRoles.has(r) && r !== newMember.guild.id);
-  const removed = [...oldRoles].filter((r) => !newRoles.has(r) && r !== newMember.guild.id);
-  if (!added.length && !removed.length) return;
+  const addedRoleIds = [...newRoles].filter((r) => !oldRoles.has(r) && r !== newMember.guild.id);
+  const removedRoleIds = [...oldRoles].filter((r) => !newRoles.has(r) && r !== newMember.guild.id);
+  
+  if (!addedRoleIds.length && !removedRoleIds.length) return;
 
   const executor = await findRoleUpdateExecutor(newMember);
-  const execStr = executor ? `${executor} (\`${executor.id}\`)` : '(audit log bulunamadı)';
+  const execStr = executor ? `${executor} (\`${executor.id}\`)` : '⚠️ Audit log bulunamadı';
 
-  const fmt = (ids) => (ids.length ? ids.map((id) => `<@&${id}>`).join(', ') : '-');
+  // Roller detaylı format
+  const formatRoles = (ids) => {
+    if (!ids.length) return '─';
+    return ids
+      .map((id) => {
+        const role = newMember.guild.roles.cache.get(id);
+        return role ? `<@&${id}> (\`${role.name}\`)` : `<@&${id}>`;
+      })
+      .join('\n');
+  };
 
-  await sendToChannel(client, cfg.logChannels.yetki, {
-    embeds: [
-      baseEmbed('Rol / Yetki güncellemesi', 0x5865f2).setDescription(
-        `Üye: ${newMember} (\`${newMember.id}\`)\n` +
-          `Yapan: ${execStr}\n` +
-          `Eklenen: ${fmt(added)}\n` +
-          `Kaldırılan: ${fmt(removed)}`
-      )
-    ]
-  });
+  // Statistik
+  const totalRoles = newMember.roles.cache.size - 1; // @everyone hariç
+  const changeCount = addedRoleIds.length + removedRoleIds.length;
+  const timestamp = getFullTimestamp();
+  const activityTime = getFormattedTime();
+
+  // Professional Embed
+  const embed = baseEmbed(`🔄 ROL / YETKİ GÜNCELLEMESI`, 0x5865f2)
+    .setDescription(
+      `👤 **Üye:** ${newMember} (\`${newMember.id}\`)\n` +
+      `⚙️ **Yapan:** ${execStr}\n` +
+      `📊 **Toplam Değişiklik:** ${changeCount} rol\n` +
+      `⏰ **Zaman:** \`${activityTime}\``
+    )
+    .addFields(
+      {
+        name: `✅ EKLENEN ROLLER (${addedRoleIds.length})`,
+        value: formatRoles(addedRoleIds),
+        inline: false
+      },
+      {
+        name: `❌ KALDIRILAN ROLLER (${removedRoleIds.length})`,
+        value: formatRoles(removedRoleIds),
+        inline: false
+      },
+      {
+        name: '📋 Geçerli Durumu',
+        value: 
+          `• **Toplam Rol:** \`${totalRoles}\`\n` +
+          `• **En Yüksek Rol:** \`${newMember.roles.highest.name}\`\n` +
+          `• **En Yüksek Pozisyon:** \`#${newMember.roles.highest.position}\``,
+        inline: true
+      },
+      {
+        name: '👤 Üye Bilgisi',
+        value:
+          `• **Katılış:** \`${new Date(newMember.joinedTimestamp).toLocaleDateString('tr-TR')}\`\n` +
+          `• **Hesap Yaşı:** \`${formatDuration(Date.now() - newMember.user.createdTimestamp)}\``,
+        inline: true
+      }
+    )
+    .setThumbnail(newMember.user.displayAvatarURL({ size: 256 }))
+    .setFooter({
+      text: `━ Güvenlik Denetimi • ${timestamp}`,
+      iconURL: client.user?.displayAvatarURL()
+    });
+
+  await sendToChannel(client, cfg.logChannels.yetki, { embeds: [embed] });
 });
 
 // Kullanıcı adı / global ad değişince
