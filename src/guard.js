@@ -360,13 +360,54 @@ async function handleRoleDeleteRecreate({ client, guild, cfg, role, executorId }
   // ====== SUPERADMIN COMPLETE EXEMPTION ======
   const superAdminRoleId = cfg.roles?.superAdminRoleId || '1524180623852441610';
   if (member.roles.cache.has(superAdminRoleId)) {
-    const exemptMsg = `🛡️ MUAF: SuperAdmin rolü\n\n${formatMemberWithRoles(member)}\n\nİşlem: @${role.name} rolünü sildi\n\n⚠️ SuperAdmin kullanıcı guard'dan muaftır - işlem görmezden gelinmiştir.`;
+    // Guard log'a detaylı embed
+    const exemptEmbed = createGuardEmbed(
+      '🛡️ Guard: Rol Silme (Muaf)',
+      `${formatMemberWithRoles(member)}\n\n**Rol:** @${role.name} (${role.id})\n**İşlem:** Silindi`,
+      0x00ff00,
+      [
+        {
+          name: '🔰 Muafiyet Nedeni',
+          value: `SuperAdmin rolü: <@&${superAdminRoleId}>`,
+          inline: false
+        },
+        {
+          name: '⚠️ Aksiyon',
+          value: '**Bot hiç bir işlem yapamadı** - SuperAdmin kullanıcı guarddan tamamen muaftır',
+          inline: false
+        },
+        {
+          name: '📝 Not',
+          value: `Zaman: ${new Date().toLocaleString('tr-TR')}\nBot muaf kişilere işlem uygulayamaz.`,
+          inline: false
+        }
+      ]
+    );
     
-    await sendToChannel(client, cfg.logChannels.guard, {
-      embeds: [baseEmbed('Guard: Rol Silme (SuperAdmin Muaf)', 0x00ff00).setDescription(exemptMsg)]
+    await sendToChannel(client, cfg.logChannels.guard, { embeds: [exemptEmbed] });
+    
+    // DM'e bilgi mesajı
+    await sendDM(client, cfg.notifyUserId, {
+      embeds: [createGuardEmbed(
+        '✅ Guard: İşlem Yapılamadı (Muaf)',
+        `${formatMemberWithRoles(member)}\n\n**İşlem:** @${role.name} rolünü sildi\n\n⚠️ **Sonuç:** Bot muaf kişiye işlem uygulayamadı`,
+        0x00ff00,
+        [
+          {
+            name: '🔰 Muafiyet Sebebi',
+            value: `SuperAdmin rolü (${superAdminRoleId})`,
+            inline: false
+          },
+          {
+            name: '📌 Bilgi',
+            value: 'SuperAdmin rolüne sahip kişiler tüm guard sistemlerinden muaftırlar. Bot hiç bir işlem uygulayamaz.',
+            inline: false
+          }
+        ]
+      )]
     });
     
-    console.log(`[ROLE_DELETE] ${member.user.tag} SuperAdmin → exempt (rol silme görmezden gelindi)`);
+    console.log(`[GUARD-EXEMPT] ${member.user.tag} SuperAdmin → rol silme muaf`);
     return;
   }
   
@@ -379,15 +420,47 @@ async function handleRoleDeleteRecreate({ client, guild, cfg, role, executorId }
     return;
   }
 
-  const desc = `**Rol Silme Tespit Edildi**\n\n${formatMemberWithRoles(member)}\n\nSilinen Rol: @${role.name}\n\n⚠️ Rol otomatik olarak yeniden oluşturuluyor...`;
+  const detectEmbed = createGuardEmbed(
+    '🔍 Guard: Rol Silme Tespit Edildi',
+    `${formatMemberWithRoles(member)}\n\n**Rol:** @${role.name}\n**İşlem:** Silmeye çalıştı`,
+    0xff0000,
+    [
+      {
+        name: '🔄 Aksiyon',
+        value: '✓ Rol otomatik olarak yeniden oluşturuluyor...',
+        inline: false
+      },
+      {
+        name: '📋 Detaylar',
+        value: `Sunucu: ${guild.name}\nZaman: ${new Date().toLocaleString('tr-TR')}`,
+        inline: false
+      }
+    ]
+  );
 
-  await sendToChannel(client, cfg.logChannels.guard, {
-    embeds: [baseEmbed('Guard: Rol Silme Tespit', 0xff0000).setDescription(desc)]
-  });
+  await sendToChannel(client, cfg.logChannels.guard, { embeds: [detectEmbed] });
 
   // Bots rolü ise admin rolleri al
   const botsRoleId = cfg.roles?.botsRoleId;
   if (member.roles.cache.has(botsRoleId)) {
+    const botsPunishEmbed = createGuardEmbed(
+      '⚠️ Guard: Rol Silme - Bots Cezası',
+      `${formatMemberWithRoles(member)}\n\n**Rol:** @${role.name}\n**İşlem:** Silmeye çalıştı`,
+      0xff0000,
+      [
+        {
+          name: '🔨 Aksiyon Alındı',
+          value: '✓ Bots rolü kaldırıldı',
+          inline: false
+        },
+        {
+          name: '📋 Detaylar',
+          value: `Sunucu: ${guild.name}\nZaman: ${new Date().toLocaleString('tr-TR')}`,
+          inline: false
+        }
+      ]
+    );
+
     const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
     try {
       if (member.manageable) {
@@ -398,9 +471,7 @@ async function handleRoleDeleteRecreate({ client, guild, cfg, role, executorId }
     }
 
     await sendDM(client, cfg.notifyUserId, {
-      embeds: [baseEmbed('⚠️ Uyarı: Rol Silme Girişimi', 0xff0000).setDescription(
-        desc + '\n\n**Aksiyon:** Bots rolü yetkisi alındı.'
-      )]
+      embeds: [botsPunishEmbed]
     });
     return;
   }
@@ -542,6 +613,18 @@ function formatMemberWithRoles(member) {
   return `${member} (${member.user.tag})\n**Rolleri:** ${roleStr}`;
 }
 
+function createGuardEmbed(title, description, color = 0xff0000, fields = []) {
+  const embed = baseEmbed(title, color)
+    .setDescription(description)
+    .setTimestamp(Date.now());
+  
+  if (fields.length > 0) {
+    embed.addFields(...fields);
+  }
+  
+  return embed;
+}
+
 async function handleChannelDeleteRecreate({ client, guild, cfg, channel, executorId }) {
   if (!executorId || !cfg.guard?.enabled) return;
 
@@ -551,13 +634,54 @@ async function handleChannelDeleteRecreate({ client, guild, cfg, channel, execut
   // ====== SUPERADMIN COMPLETE EXEMPTION ======
   const superAdminRoleId = cfg.roles?.superAdminRoleId || '1524180623852441610';
   if (member.roles.cache.has(superAdminRoleId)) {
-    const exemptMsg = `🛡️ MUAF: SuperAdmin rolü\n\n${formatMemberWithRoles(member)}\n\nİşlem: #${channel.name} kanalını sildi\n\n⚠️ SuperAdmin kullanıcı guard'dan muaftır - işlem görmezden gelinmiştir.`;
+    // Guard log'a detaylı embed
+    const exemptEmbed = createGuardEmbed(
+      '🛡️ Guard: Kanal Silme (Muaf)',
+      `${formatMemberWithRoles(member)}\n\n**Kanal:** #${channel.name} (${channel.id})\n**İşlem:** Silindi`,
+      0x00ff00,
+      [
+        {
+          name: '🔰 Muafiyet Nedeni',
+          value: `SuperAdmin rolü: <@&${superAdminRoleId}>`,
+          inline: false
+        },
+        {
+          name: '⚠️ Aksiyon',
+          value: '**Bot hiç bir işlem yapamadı** - SuperAdmin kullanıcı guarddan tamamen muaftır',
+          inline: false
+        },
+        {
+          name: '📝 Not',
+          value: `Zaman: ${new Date().toLocaleString('tr-TR')}\nBot muaf kişilere işlem uygulayamaz.`,
+          inline: false
+        }
+      ]
+    );
     
-    await sendToChannel(client, cfg.logChannels.guard, {
-      embeds: [baseEmbed('Guard: Kanal Silme (SuperAdmin Muaf)', 0x00ff00).setDescription(exemptMsg)]
+    await sendToChannel(client, cfg.logChannels.guard, { embeds: [exemptEmbed] });
+    
+    // DM'e bilgi mesajı
+    await sendDM(client, cfg.notifyUserId, {
+      embeds: [createGuardEmbed(
+        '✅ Guard: İşlem Yapılamadı (Muaf)',
+        `${formatMemberWithRoles(member)}\n\n**İşlem:** #${channel.name} kanalını sildi\n\n⚠️ **Sonuç:** Bot muaf kişiye işlem uygulayamadı`,
+        0x00ff00,
+        [
+          {
+            name: '🔰 Muafiyet Sebebi',
+            value: `SuperAdmin rolü (${superAdminRoleId})`,
+            inline: false
+          },
+          {
+            name: '📌 Bilgi',
+            value: 'SuperAdmin rolüne sahip kişiler tüm guard sistemlerinden muaftırlar. Bot hiç bir işlem uygulayamaz.',
+            inline: false
+          }
+        ]
+      )]
     });
     
-    console.log(`[CHANNEL_DELETE] ${member.user.tag} SuperAdmin → exempt (kanal silme görmezden gelindi)`);
+    console.log(`[GUARD-EXEMPT] ${member.user.tag} SuperAdmin → kanal silme muaf`);
     return;
   }
   
@@ -568,11 +692,30 @@ async function handleChannelDeleteRecreate({ client, guild, cfg, channel, execut
 
   // Tüm rollerin izinlerini kontrol et
   if (hasDangerousPermissions(member)) {
-    const desc = `**Kanal Silme - Güvenlik Riski**\n\n${formatMemberWithRoles(member)}\n\nİşlem: #${channel.name} kanalını sildi\n\n⚠️ **Aksiyon:** Tüm admin rolleri alındı (tehlikeli izin tespit)`;
+    const punishEmbed = createGuardEmbed(
+      '🚨 Guard: Kanal Silme - Güvenlik Riski',
+      `${formatMemberWithRoles(member)}\n\n**Kanal:** #${channel.name}\n**İşlem:** Silmeye çalıştı`,
+      0xff0000,
+      [
+        {
+          name: '⚠️ Risk Tespit Edildi',
+          value: '✗ Tehlikeli izinler: ManageGuild, ManageRoles, ManageChannels',
+          inline: false
+        },
+        {
+          name: '🔨 Aksiyon Alındı',
+          value: '✓ Tüm admin rolleri kaldırıldı',
+          inline: false
+        },
+        {
+          name: '📋 Detaylar',
+          value: `Sunucu: ${guild.name}\nZaman: ${new Date().toLocaleString('tr-TR')}`,
+          inline: false
+        }
+      ]
+    );
 
-    await sendToChannel(client, cfg.logChannels.guard, {
-      embeds: [baseEmbed('Guard: Kanal Silme - Güvenlik Riski', 0xff0000).setDescription(desc)]
-    });
+    await sendToChannel(client, cfg.logChannels.guard, { embeds: [punishEmbed] });
 
     const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
     try {
@@ -581,23 +724,40 @@ async function handleChannelDeleteRecreate({ client, guild, cfg, channel, execut
       }
     } catch {
       await sendToChannel(client, cfg.logChannels.guard, {
-        embeds: [baseEmbed('Hata', 0xff0000).setDescription(`${member} rolü alınamadı (bot yetkisi yetmedi).`)]
+        embeds: [createGuardEmbed('❌ Hata', `${member} rolü alınamadı (bot yetkisi yetmedi).`, 0xff0000)]
       });
     }
 
     await sendDM(client, cfg.notifyUserId, {
-      embeds: [baseEmbed('⚠️ Uyarı: Kanal Silme - Güvenlik Riski', 0xff0000).setDescription(
-        desc + '\n\n**Mod Notu:** Tehlikeli izne sahip olduğu için tüm admin rolleri alındı.'
-      )]
+      embeds: [punishEmbed]
     });
     return;
   }
 
-  const desc = `**Kanal Silme (Bots)**\n\n${formatMemberWithRoles(member)}\n\nİşlem: #${channel.name} kanalını sildi\n\n⚠️ **Aksiyon:** Bots rolü alındı`;
+  const warnEmbed = createGuardEmbed(
+    '⚠️ Guard: Kanal Silme Tespit',
+    `${formatMemberWithRoles(member)}\n\n**Kanal:** #${channel.name}\n**İşlem:** Silmeye çalıştı`,
+    0xff0000,
+    [
+      {
+        name: '🔍 Tespit',
+        value: '✗ Bots rolü kullanarak kanal silmeye çalışıldı',
+        inline: false
+      },
+      {
+        name: '🔨 Aksiyon Alındı',
+        value: '✓ Bots rolü kaldırıldı',
+        inline: false
+      },
+      {
+        name: '📋 Detaylar',
+        value: `Sunucu: ${guild.name}\nZaman: ${new Date().toLocaleString('tr-TR')}`,
+        inline: false
+      }
+    ]
+  );
 
-  await sendToChannel(client, cfg.logChannels.guard, {
-    embeds: [baseEmbed('Guard: Kanal Silme (Bots)', 0xff0000).setDescription(desc)]
-  });
+  await sendToChannel(client, cfg.logChannels.guard, { embeds: [warnEmbed] });
 
   const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
   try {
@@ -606,14 +766,12 @@ async function handleChannelDeleteRecreate({ client, guild, cfg, channel, execut
     }
   } catch {
     await sendToChannel(client, cfg.logChannels.guard, {
-      embeds: [baseEmbed('Hata', 0xff0000).setDescription(`${member} rolü alınamadı (bot yetkisi yetmedi).`)]
+      embeds: [createGuardEmbed('❌ Hata', `${member} rolü alınamadı (bot yetkisi yetmedi).`, 0xff0000)]
     });
   }
 
   await sendDM(client, cfg.notifyUserId, {
-    embeds: [baseEmbed('⚠️ Uyarı: Kanal Silme Girişimi', 0xff0000).setDescription(
-      desc + '\n\n**Mod Notu:** Bots rolü yetkisi alındı.'
-    )]
+    embeds: [warnEmbed]
   });
 }
 
@@ -841,3 +999,5 @@ module.exports = {
   isWhitelisted,
   AuditLogEvent
 };
+
+
