@@ -1433,43 +1433,169 @@ client.on('userUpdate', async (oldUser, newUser) => {
   if (!guild) return;
 });
 
-// Mesaj silinme logu
+// ═══════════════════════════════════════════════════════════════════
+// 🗑️ MESAJ SİLİNDİ LOG SISTEMI (Ultra Detaylı)
+// ═══════════════════════════════════════════════════════════════════
+
 client.on('messageDelete', async (message) => {
   if (!message.guild) return;
   if (!isAllowedGuild(message.guild)) return;
   if (message.author?.bot) return;
 
-  // Silinen mesajı kaydet (snipe için)
-  const key = `${message.guildId}:${message.channelId}`;
-  deletedMessages.set(key, {
-    author: message.author,
-    content: message.content || '(boş)',
-    at: Date.now()
-  });
-
-  const content = message.partial ? '(mesaj cache yok)' : (message.content || '(boş)');
-  const contentTruncated = safeTruncate(content, 500);
-  
-  // Kimin sildiğini bul (audit log)
-  let deletedBy = 'Bot/Sistem';
   try {
-    const logs = await message.guild.fetchAuditLogs({ limit: 5, type: AuditLogEvent.MessageDelete }).catch(() => null);
-    const entry = logs?.entries?.first();
-    if (entry && entry.executor) {
-      deletedBy = `${entry.executor.tag} (\`${entry.executor.id}\`)`;
-    }
-  } catch {}
+    // ===== MESAJ VERİLERİNİ AL =====
+    const messageId = message.id;
+    const guildId = message.guildId;
+    const channelId = message.channelId;
+    const createdTimestamp = message.createdTimestamp;
+    
+    // İçerik ve yazar bilgisi
+    let authorId = message.author?.id || 'Bilinmiyor';
+    let authorTag = message.author?.tag || 'Bilinmiyor Kullanıcı';
+    let authorAvatar = message.author?.displayAvatarURL({ size: 256 }) || null;
+    const messageContent = message.partial ? '(mesaj bellekte yok)' : (message.content || '(boş mesaj)');
+    const contentTruncated = safeTruncate(messageContent, 800);
 
-  await sendToChannel(client, cfg.logChannels.general, {
-    embeds: [
-      baseEmbed('🗑️ Mesaj silindi', 0xed4245)
-        .setDescription(
-          `**Silen:** ${deletedBy}\n` +
-          `**Kanal:** <#${message.channelId}>\n` +
-          `**İçerik:**\n${contentTruncated}`
-        )
-    ]
-  });
+    // Ekleri al (varsa)
+    const attachments = message.attachments.size > 0 
+      ? message.attachments.map(att => `[${att.name || 'Dosya'} - ${att.size} byte]`).join('\n')
+      : 'Ek yok';
+
+    // ===== AUDIT LOG'DAN SİLEN KİŞİYİ BUL =====
+    let deletedBy = 'Bot/Sistem';
+    let deletedById = 'Bilinmiyor';
+    let deletedByAvatar = null;
+    
+    try {
+      const auditLogs = await message.guild.fetchAuditLogs({ 
+        limit: 5, 
+        type: AuditLogEvent.MessageDelete 
+      }).catch(() => null);
+      
+      if (auditLogs?.entries?.size > 0) {
+        const entry = auditLogs.entries.first();
+        if (entry?.executor) {
+          deletedBy = `${entry.executor.tag}`;
+          deletedById = entry.executor.id;
+          deletedByAvatar = entry.executor.displayAvatarURL({ size: 256 });
+        }
+      }
+    } catch (err) {
+      console.error('[MESSAGE_DELETE_LOG] Audit log hatası:', err.message);
+    }
+
+    // ===== DISCORD ZAMANLANDıRMASı =====
+    const deleteTime = Math.floor(Date.now() / 1000);
+    const createdTime = Math.floor(createdTimestamp / 1000);
+    const timeAgoStr = `<t:${deleteTime}:R>`; // "1 saat önce" gibi
+    const fullTimeStr = `<t:${deleteTime}:F>`; // "26 Temmuz 2026 14:30:45" gibi
+
+    // ===== PROFESYONEL EMBED OLUŞTUR =====
+    const embed = baseEmbed('🗑️ MESAJ SİLİNDİ', 0xed4245);
+
+    // Açıklama
+    embed.setDescription(
+      `📝 **Silinen Mesaj İçeriği:**\n\`\`\`\n${contentTruncated}\n\`\`\``
+    );
+
+    // Yazar Bilgisi
+    embed.addFields({
+      name: '👤 Mesajı Yazan Kişi',
+      value: 
+        `• **Kullanıcı:** ${authorTag}\n` +
+        `• **ID:** \`${authorId}\`\n` +
+        `• **Etiket:** <@${authorId}>\n` +
+        `• **Gönderildi:** ${timeAgoStr} (${fullTimeStr})`,
+      inline: false
+    });
+
+    // Silen Bilgisi
+    embed.addFields({
+      name: '⚙️ Mesajı Silen Kişi',
+      value:
+        `• **Moderatör:** ${deletedBy}\n` +
+        `• **ID:** \`${deletedById}\`\n` +
+        `• **Etiket:** <@${deletedById}>\n` +
+        `• **Silinme Zamanı:** ${fullTimeStr}`,
+      inline: false
+    });
+
+    // Kanal Bilgisi
+    embed.addFields({
+      name: '📍 Kanal Bilgisi',
+      value:
+        `• **Kanal:** <#${channelId}>\n` +
+        `• **Kanal ID:** \`${channelId}\`\n` +
+        `• **Sunucu:** \`${message.guild.name}\``,
+      inline: false
+    });
+
+    // Ekleri göster (varsa)
+    if (message.attachments.size > 0) {
+      embed.addFields({
+        name: '📎 Ekler',
+        value: attachments,
+        inline: false
+      });
+    }
+
+    // Metadata
+    embed.addFields({
+      name: '📊 Mesaj Metadata',
+      value:
+        `• **Mesaj ID:** \`${messageId}\`\n` +
+        `• **Gönderme Saati:** <t:${createdTime}:F>\n` +
+        `• **Silinme Saati:** <t:${deleteTime}:F>`,
+      inline: false
+    });
+
+    // Yazar Avatar (başlıkta)
+    if (authorAvatar) {
+      embed.setAuthor({
+        name: authorTag,
+        iconURL: authorAvatar,
+        url: null
+      });
+    }
+
+    // Silen kişi Thumbnail
+    if (deletedByAvatar) {
+      embed.setThumbnail(deletedByAvatar);
+    }
+
+    // Footer
+    embed.setFooter({
+      text: `🗑️ Mesaj Denetim Sistemi • Sunucu: ${message.guild.name}`,
+      iconURL: client.user?.displayAvatarURL()
+    });
+
+    // ===== LOGu GÖNDER =====
+    await sendToChannel(client, cfg.logChannels.general, { embeds: [embed] });
+
+    // ===== CACHE'E KAYDET =====
+    const key = `${guildId}:${channelId}`;
+    deletedMessages.set(key, {
+      id: messageId,
+      author: message.author,
+      content: messageContent,
+      attachments: [...message.attachments.values()],
+      at: Date.now(),
+      deletedBy: deletedBy
+    });
+
+  } catch (error) {
+    console.error('[MESSAGE_DELETE_LOG] Hata:', error);
+    await logError({
+      client,
+      cfg,
+      error,
+      context: 'Message Delete Handler',
+      additionalData: {
+        'Mesaj ID': message.id,
+        'Kanal ID': message.channelId
+      }
+    });
+  }
 });
 
 // Mesaj edit logu
