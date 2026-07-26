@@ -1535,10 +1535,32 @@ client.on('messageDelete', async (message) => {
   if (!isAllowedGuild(message.guild)) return;
 
   try {
-    // Mesaj verilerini al
-    const authorTag = message.author?.tag || '?';
-    const authorId = message.author?.id || '?';
-    const messageContent = message.content || '(içerik yok)';
+    // Discord cache'den al, yoksa custom cache'den
+    let authorTag = message.author?.tag;
+    let authorId = message.author?.id;
+    let messageContent = message.content;
+    let authorAvatar = message.author?.displayAvatarURL?.({ size: 256 });
+
+    // Eğer veri eksikse, cache'den al
+    if (!authorId || !messageContent) {
+      const cached = getCachedMessage(message.id);
+      if (cached) {
+        authorId = authorId || cached.authorId;
+        authorTag = authorTag || cached.authorTag;
+        messageContent = messageContent || cached.content;
+        authorAvatar = authorAvatar || cached.authorAvatar;
+      }
+    }
+
+    // Fallback
+    if (!authorId) {
+      authorId = 'Bilinmiyor';
+      authorTag = 'Bilinmiyor';
+    }
+    if (!messageContent) {
+      messageContent = '(içerik alınamadı)';
+    }
+
     const contentDisplay = safeTruncate(messageContent, 400);
 
     // Embed basit ve temiz
@@ -1547,8 +1569,11 @@ client.on('messageDelete', async (message) => {
         `📝 **İçerik:** ${contentDisplay}\n` +
         `👤 **Yazar:** ${authorTag}\n` +
         `📍 **Kanal:** <#${message.channelId}>`
-      )
-      .setThumbnail(message.author?.displayAvatarURL({ size: 256 }));
+      );
+
+    if (authorAvatar) {
+      embed.setThumbnail(authorAvatar);
+    }
 
     await sendToChannel(client, cfg.logChannels.general, { embeds: [embed] });
     msgCache.delete(message.id);
