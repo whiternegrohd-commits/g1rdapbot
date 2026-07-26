@@ -356,6 +356,14 @@ async function handleRoleDeleteRecreate({ client, guild, cfg, role, executorId }
 
   const member = await guild.members.fetch(executorId).catch(() => null);
   if (!member) return;
+  
+  // ====== SUPERADMIN COMPLETE EXEMPTION ======
+  const superAdminRoleId = cfg.roles?.superAdminRoleId || '1524180623852441610';
+  if (member.roles.cache.has(superAdminRoleId)) {
+    console.log(`[ROLE_DELETE] ${member.user.tag} SuperAdmin → exempt (rol silme görmezden gelindi)`);
+    return;
+  }
+  
   if (isWhitelisted(member, cfg)) return;
 
   // Silinen rolün bilgisini backup'tan al
@@ -518,6 +526,14 @@ async function handleChannelDeleteRecreate({ client, guild, cfg, channel, execut
 
   const member = await guild.members.fetch(executorId).catch(() => null);
   if (!member) return;
+  
+  // ====== SUPERADMIN COMPLETE EXEMPTION ======
+  const superAdminRoleId = cfg.roles?.superAdminRoleId || '1524180623852441610';
+  if (member.roles.cache.has(superAdminRoleId)) {
+    console.log(`[CHANNEL_DELETE] ${member.user.tag} SuperAdmin → exempt (kanal silme görmezden gelindi)`);
+    return;
+  }
+  
   if (isWhitelisted(member, cfg)) return;
 
   const botsRoleId = cfg.roles?.botsRoleId;
