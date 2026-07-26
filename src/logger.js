@@ -265,7 +265,7 @@ function formatMessage(emoji, title, details) {
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * Üye aktivitesini ayrıntılı şekilde kaydeder
+ * Üye aktivitesini kaydeder
  * @param {object} options - Kayıt parametreleri
  * @param {Client} options.client - Discord bot client
  * @param {object} options.cfg - Bot konfigürasyonu
@@ -285,24 +285,15 @@ async function logMemberActivity({
 }) {
   try {
     const color = critical ? 0xff0000 : 0x5865f2;
-    const emoji = critical ? '⚠️' : '👤';
+    const emoji = critical ? '🚨' : '👤';
     
-    const embed = baseEmbed(`${emoji} ÜYE AKTİVİTESİ`, color)
+    const embed = baseEmbed(`${emoji} ${action}`, color)
       .setDescription(
-        `👤 **Üye:** ${user} (\`${user.id}\`)\n` +
-        `📋 **İşlem:** \`${action}\`\n` +
-        `${details ? `📝 **Detaylar:** ${safeTruncate(details, 500)}\n` : ''}` +
-        `⏰ **Zaman:** \`${getFullTimestamp()}\`\n` +
-        `${critical ? `🚨 **Durum:** KRİTİK\n` : ''}`
+        `👤 **Üye:** ${user}\n` +
+        `📋 **İşlem:** ${action}` +
+        `${details ? `\n📝 **Detay:** ${safeTruncate(details, 300)}` : ''}`
       )
-      .setThumbnail(user.displayAvatarURL({ size: 256 }))
-      .addFields(
-        {
-          name: '📊 Hesap Bilgisi',
-          value: `Oluşturulma: \`${new Date(user.createdTimestamp).toLocaleDateString('tr-TR')}\``,
-          inline: false
-        }
-      );
+      .setThumbnail(user.displayAvatarURL({ size: 256 }));
 
     await sendToChannel(client, cfg.logChannels?.memberActivity, { embeds: [embed] });
   } catch (error) {
@@ -315,7 +306,7 @@ async function logMemberActivity({
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * Bot iç işlemlerini ayrıntılı şekilde kaydeder
+ * Bot iç işlemlerini basit şekilde kaydeder
  * @param {object} options - Kayıt parametreleri
  * @param {Client} options.client - Discord bot client
  * @param {object} options.cfg - Bot konfigürasyonu
@@ -358,101 +349,37 @@ async function logBotInternal({
     const embed = new EmbedBuilder()
       .setTitle(`${emoji} ${title}`)
       .setColor(color)
-      .setDescription(safeTruncate(message, 2000))
+      .setDescription(safeTruncate(message, 1024))
       .setTimestamp(Date.now());
 
-    // ===== FIELDS =====
+    // Sadece gerekli bilgileri ekle
     const fields = [];
-
-    // Seviye ve Zaman
-    fields.push({
-      name: '🎯 Seviye',
-      value: `\`${level}\``,
-      inline: true
-    });
-
-    fields.push({
-      name: '⏰ Zaman',
-      value: `\`${getFormattedTime()}\``,
-      inline: true
-    });
-
-    // Bot Bilgisi
-    if (client?.user) {
-      fields.push({
-        name: '🤖 Bot',
-        value: `\`${client.user.tag}\``,
-        inline: true
-      });
-
-      fields.push({
-        name: '👥 Toplam Kullanıcı',
-        value: `\`${client.users.cache.size.toLocaleString('tr-TR')}\``,
-        inline: true
-      });
-    }
-
-    // Sunucu Sayısı
-    if (client) {
-      fields.push({
-        name: '🏢 Aktif Sunucular',
-        value: `\`${client.guilds.cache.size}\``,
-        inline: true
-      });
-    }
-
-    // Çalışma Süresi
-    fields.push({
-      name: '⏱️ Çalışma Süresi',
-      value: `\`${getFormattedUptime()}\``,
-      inline: true
-    });
-
-    // Bellek Kullanımı
-    const memory = getMemoryInfo();
-    fields.push({
-      name: '💾 Bellek',
-      value: `\`${memory.used}MB / ${memory.total}MB (${memory.percentage}%)\``,
-      inline: true
-    });
-
-    // CPU/İşlem Bilgisi
-    if (process.cpuUsage) {
-      const cpu = process.cpuUsage();
-      const userCPU = (cpu.user / 1000000).toFixed(2);
-      fields.push({
-        name: '⚙️ CPU Zamanı',
-        value: `\`${userCPU}s\``,
-        inline: true
-      });
-    }
-
-    // Detaylar
+    
     if (details) {
       fields.push({
         name: '📋 Detaylar',
-        value: `\`\`\`\n${safeTruncate(details, 500)}\n\`\`\``,
+        value: safeTruncate(details, 300),
         inline: false
       });
     }
 
-    // İlave Veri
     if (Object.keys(data).length > 0) {
       const dataStr = Object.entries(data)
-        .map(([key, value]) => `${key}: ${value}`)
+        .map(([key, value]) => `**${key}:** ${value}`)
         .join('\n');
       fields.push({
-        name: '📊 Ek Veriler',
-        value: `\`\`\`\n${safeTruncate(dataStr, 500)}\n\`\`\``,
+        name: '📊 Bilgi',
+        value: safeTruncate(dataStr, 300),
         inline: false
       });
     }
 
-    embed.addFields(...fields);
+    if (fields.length > 0) {
+      embed.addFields(...fields);
+    }
 
-    // Footer
     embed.setFooter({ 
-      text: `━ Sistem Durumu • ${getFullTimestamp()}`,
+      text: `${getFormattedTime()}`,
       iconURL: client?.user?.displayAvatarURL()
     });
 
@@ -485,7 +412,7 @@ function logCommandUsage({ client, cfg, member, command, args, success = true, e
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * Komut kullanımını detaylı şekilde kaydeder
+ * Komut kullanımını kaydeder
  * @param {object} options - Kayıt parametreleri
  * @param {Client} options.client - Discord bot client
  * @param {object} options.cfg - Bot konfigürasyonu
@@ -511,23 +438,13 @@ async function logCommandUsageDetailed({
     const statusEmoji = success ? '✅' : '❌';
     const statusColor = success ? 0x57f287 : 0xff0000;
 
-    const embed = baseEmbed(`${statusEmoji} KOMUT ÇALIŞTIRMA`, statusColor)
+    const embed = baseEmbed(`${statusEmoji} ${command.toUpperCase()}`, statusColor)
       .setDescription(
-        `👤 **Kullanıcı:** ${member} (\`${member.id}\`)\n` +
-        `📝 **Komut:** \`${command}\`\n` +
-        `${args.length > 0 ? `📋 **Parametreler:** \`${args.join(' ')}\`\n` : 'Parametre yok\n'}` +
-        `⏱️ **Çalışma Süresi:** \`${duration}\`\n` +
-        `⏰ **Zaman:** \`${getFormattedTime()}\`\n` +
-        `${!success && error ? `🚨 **Hata Mesajı:** ${safeTruncate(error, 500)}\n` : ''}`
+        `👤 **Kullanıcı:** ${member}\n` +
+        `${args.length > 0 ? `📋 **Parametreler:** \`${args.join(' ')}\`` : 'Parametre yok'}` +
+        `${!success && error ? `\n🚨 **Hata:** ${safeTruncate(error, 300)}` : ''}`
       )
-      .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-      .addFields(
-        {
-          name: '📊 Durum Detayları',
-          value: `Başarılı: ${success ? '✅ Evet' : '❌ Hayır'}\nRol: ${member.roles.highest.name}`,
-          inline: true
-        }
-      );
+      .setThumbnail(member.user.displayAvatarURL({ size: 256 }));
 
     await sendToChannel(client, cfg.logChannels?.botInternal, { embeds: [embed] });
   } catch (error) {
@@ -563,39 +480,26 @@ async function logSecurityEvent({
   severity = 5
 }) {
   try {
-    let color = 0xff0000;
-    let emoji = '🚨';
+    let emoji = '⚠️';
+    let color = 0xff6b6b;
     
     if (severity <= 3) {
-      color = 0xffa500;
       emoji = '⚠️';
-    } else if (severity <= 6) {
-      color = 0xff6b6b;
-      emoji = '⛔';
+      color = 0xffa500;
+    } else if (severity >= 7) {
+      emoji = '🚨';
+      color = 0xff0000;
     }
 
-    const severityLabel = severity <= 3 ? 'DÜŞÜK' : severity <= 6 ? 'ORTA' : 'YÜKSEK';
-    const actorTag = actor?.user?.tag || actor?.tag || actor?.toString() || 'Bilinmeyen';
+    const description = 
+      `🔐 **Olayı:** ${type}\n` +
+      `👤 **Yapan:** ${actor}` +
+      `${target ? `\n🎯 **Hedef:** ${target}` : ''}` +
+      `${reason ? `\n📌 **Sebep:** ${reason}` : ''}` +
+      `${details ? `\n📋 **Detay:** ${safeTruncate(details, 300)}` : ''}`;
 
-    const embed = baseEmbed(`${emoji} GÜVENLİK OLAYI - ${type.toUpperCase()}`, color)
-      .setDescription(
-        `🚨 **Olay Tipi:** \`${type}\`\n` +
-        `👤 **İşlemi Yapan:** ${actor} (\`${actor?.id || 'N/A'}\`)\n` +
-        `${target ? `🎯 **Hedef:** ${target} (\`${target?.id || 'N/A'}\`)\n` : ''}` +
-        `📌 **Sebep:** ${reason || 'Belirtilmedi'}\n` +
-        `📊 **Tehdit Seviyesi:** \`${severityLabel}\` [${severity}/10]\n` +
-        `⏰ **Zaman:** \`${getFullTimestamp()}\`\n` +
-        `${details ? `📋 **Detaylar:** ${safeTruncate(details, 500)}\n` : ''}`
-      );
-
-    if (severity >= 7) {
-      embed.setColor(0xff0000);
-      embed.addFields({
-        name: '🚨 UYARI',
-        value: '`YÜKSEK TİP GÜVENLİK OLAYIDIR - HEMEN İNCELENMELİDİR`',
-        inline: false
-      });
-    }
+    const embed = baseEmbed(`${emoji} ${type.toUpperCase()}`, color)
+      .setDescription(description);
 
     await sendToChannel(client, cfg.logChannels?.guard, { embeds: [embed] });
   } catch (error) {
@@ -638,33 +542,23 @@ async function logModerationAction({
       'kick': { emoji: '👢', label: 'ATMA', color: 0xffa500 },
       'ban': { emoji: '🚫', label: 'YASAKLAMA', color: 0xff0000 },
       'unban': { emoji: '✅', label: 'YASAKLAMA KALDIRMA', color: 0x57f287 },
-      'timeout': { emoji: '⏱️', label: 'ZAMAN AŞIMI', color: 0xff9900 },
+      'timeout': { emoji: '⏱️', label: 'TIMEOUT', color: 0xff9900 },
       'role_add': { emoji: '➕', label: 'ROL EKLEME', color: 0x57f287 },
       'role_remove': { emoji: '➖', label: 'ROL ÇIKARTMA', color: 0xff0000 }
     };
 
     const actionInfo = actionMap[action.toLowerCase()] || { emoji: '❓', label: action.toUpperCase(), color: 0x2b2d31 };
-
     const targetUser = target.user || target;
-    const moderatorName = moderator.user?.tag || moderator.tag || moderator.toString();
 
     const description = 
-      `${actionInfo.emoji} **İşlem:** \`${actionInfo.label}\`\n` +
-      `👤 **Hedef Kullanıcı:** ${target} (\`${targetUser.id}\`)\n` +
-      `⚙️ **Moderatör:** ${moderator} (\`${moderator.id || moderator.user?.id}\`)\n` +
-      `📝 **Sebep:** ${safeTruncate(reason, 300)}\n` +
-      `${duration ? `⏰ **Süre:** \`${duration}\`\n` : ''}` +
-      `${caseNumber ? `🔢 **Olay #:** \`${caseNumber}\`\n` : ''}` +
-      `📅 **Zaman:** \`${getFullTimestamp()}\``;
+      `👤 **Hedef:** ${target}\n` +
+      `⚙️ **Moderatör:** ${moderator}\n` +
+      `📝 **Sebep:** ${safeTruncate(reason, 300)}` +
+      `${duration ? `\n⏰ **Süre:** \`${duration}\`` : ''}`;
 
-    const embed = baseEmbed(`${actionInfo.emoji} MODERASYoN İŞLEMİ`, actionInfo.color)
+    const embed = baseEmbed(`${actionInfo.emoji} ${actionInfo.label}`, actionInfo.color)
       .setDescription(description)
-      .setThumbnail(targetUser.displayAvatarURL({ size: 256 }))
-      .addFields({
-        name: '👤 Hedef Bilgisi',
-        value: `Hesap Yaşı: \`${formatDuration(Date.now() - targetUser.createdTimestamp)}\``,
-        inline: true
-      });
+      .setThumbnail(targetUser.displayAvatarURL({ size: 256 }));
 
     await sendToChannel(client, cfg.logChannels?.general, { embeds: [embed] });
   } catch (error) {
@@ -698,20 +592,19 @@ async function logAuditEvent({
   target = null
 }) {
   try {
-    const embed = baseEmbed(`🔍 DENETİM OLAYSI - ${type.toUpperCase()}`, 0x5865f2)
+    const embed = baseEmbed(`📝 ${type.toUpperCase()}`, 0x5865f2)
       .setDescription(
-        `📝 **Olay Tipi:** \`${type}\`\n` +
-        `${executor ? `⚙️ **Uygulayan:** ${executor} (\`${executor.id}\`)\n` : ''}` +
-        `${target ? `🎯 **Hedef:** \`${target}\`\n` : ''}` +
-        `📅 **Zaman:** \`${getFullTimestamp()}\``
+        `📌 **Olay:** ${type}\n` +
+        `${executor ? `⚙️ **Yapan:** ${executor}` : ''}` +
+        `${target ? `\n🎯 **Hedef:** \`${target}\`` : ''}`
       );
 
     if (before !== null || after !== null) {
       embed.addFields({
-        name: '📊 Değişiklik Detayları',
+        name: '📊 Değişim',
         value: 
-          `**Önceki Değer:**\n\`\`\`\n${safeTruncate(String(before), 300)}\n\`\`\`\n` +
-          `**Yeni Değer:**\n\`\`\`\n${safeTruncate(String(after), 300)}\n\`\`\``,
+          `**Öncesi:** \`${safeTruncate(String(before), 200)}\`\n` +
+          `**Sonrası:** \`${safeTruncate(String(after), 200)}\``,
         inline: false
       });
     }
@@ -727,7 +620,7 @@ async function logAuditEvent({
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * Hataları ayrıntılı şekilde kaydeder
+ * Hataları kaydeder
  * @param {object} options - Kayıt parametreleri
  * @param {Client} options.client - Discord bot client
  * @param {object} options.cfg - Bot konfigürasyonu
@@ -748,36 +641,28 @@ async function logError({
   try {
     const errorName = error?.name || 'Bilinmeyen Hata';
     const errorMessage = error?.message || String(error);
-    const errorStack = error?.stack?.split('\n').slice(0, 5).join('\n') || 'Stack bulunamadı';
 
     const embed = errorEmbed(
-      `HATA - ${errorName}`,
-      `**Bağlam:** \`${context}\`\n` +
+      `${errorName}`,
+      `**Bağlam:** ${context}\n` +
       `**Mesaj:** ${safeTruncate(errorMessage, 300)}`
-    ).addFields(
-      {
-        name: '📍 Konum',
-        value: `\`\`\`${safeTruncate(errorStack, 500)}\`\`\``,
-        inline: false
-      },
-      {
-        name: '📊 Sistem Bilgisi',
-        value: 
-          `**Çalışma Süresi:** \`${getFormattedUptime()}\`\n` +
-          `**Bellek:** \`${getMemoryInfo().used}MB\`\n` +
-          `**Zaman:** \`${getFullTimestamp()}\`` +
-          `${userId ? `\n**Kullanıcı:** \`${userId}\`` : ''}`,
-        inline: false
-      }
     );
+
+    if (userId) {
+      embed.addFields({
+        name: '👤 Kullanıcı',
+        value: `\`${userId}\``,
+        inline: true
+      });
+    }
 
     if (Object.keys(additionalData).length > 0) {
       const dataStr = Object.entries(additionalData)
         .map(([k, v]) => `${k}: ${safeTruncate(String(v), 100)}`)
         .join('\n');
       embed.addFields({
-        name: '📋 İlave Veriler',
-        value: `\`\`\`\n${dataStr}\n\`\`\``,
+        name: '📋 Ek Bilgi',
+        value: dataStr,
         inline: false
       });
     }
@@ -808,25 +693,12 @@ async function logStatistics({
   try {
     const memory = getMemoryInfo();
     
-    const embed = baseEmbed('📊 BOT İSTATİSTİKLERİ', 0x5865f2)
-      .setDescription(`📈 Anlık bot performans ve kullanım verileri`)
-      .addFields(
-        {
-          name: '👥 Kullanıcı İstatistikleri',
-          value: 
-            `Toplam Kullanıcı: \`${client.users.cache.size}\`\n` +
-            `Sunucu Sayısı: \`${client.guilds.cache.size}\`\n` +
-            `Toplam Üye: \`${client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0)}\``,
-          inline: true
-        },
-        {
-          name: '⚙️ Sistem Performansı',
-          value: 
-            `Çalışma Süresi: \`${getFormattedUptime()}\`\n` +
-            `Bellek: \`${memory.used}MB / ${memory.total}MB\`\n` +
-            `Bellek Kullanımı: \`${memory.percentage}%\``,
-          inline: true
-        }
+    const embed = baseEmbed('📊 İSTATİSTİKLER', 0x5865f2)
+      .setDescription(
+        `👥 **Kullanıcılar:** ${client.users.cache.size}\n` +
+        `🏢 **Sunucular:** ${client.guilds.cache.size}\n` +
+        `💾 **Bellek:** ${memory.used}MB / ${memory.total}MB (${memory.percentage}%)\n` +
+        `⏱️ **Uptime:** ${getFormattedUptime()}`
       );
 
     if (Object.keys(stats).length > 0) {
@@ -841,7 +713,7 @@ async function logStatistics({
     }
 
     embed.setFooter({
-      text: `━ Güncelleme Zamanı: ${getFullTimestamp()}`,
+      text: getFormattedTime(),
       iconURL: client.user?.displayAvatarURL()
     });
 
