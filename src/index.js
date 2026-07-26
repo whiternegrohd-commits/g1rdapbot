@@ -84,28 +84,31 @@ const requestDedup = new RequestDeduplicator(5000); // 5 sec dedup window
 const healthCheck = new HealthCheck();
 
 // ═══════════════════════════════════════════════════════════════════
-// 💾 GLOBAL MESSAGE CACHE (Simple Map - 24 saat otomatik temizleme)
+// 💾 GLOBAL MESSAGE CACHE (Simple Map - Auto-cleanup every hour)
 // ═══════════════════════════════════════════════════════════════════
 
 const msgCache = new Map();
-const MAX_CACHE_AGE = 24 * 60 * 60 * 1000; // 24 saat (milisaniye)
+const MAX_CACHE_AGE = 12 * 60 * 60 * 1000; // 12 saat (milisaniye)
+const MAX_CACHE_SIZE = 3000; // Max 3000 mesaj
 
-// Saatte bir 24 saatten eski mesajları temizle
+// Her 30 dakikada bir cleanup yap
 setInterval(() => {
   const now = Date.now();
   let deleted = 0;
+  
   for (const [msgId, data] of msgCache.entries()) {
     if (now - data.timestamp > MAX_CACHE_AGE) {
       msgCache.delete(msgId);
       deleted++;
     }
   }
+  
   if (deleted > 0) {
-    console.log(`[CACHE_CLEANUP] ${deleted} eski mesaj silindi | Cache boyutu: ${msgCache.size}`);
+    console.log(`[CACHE] ${deleted} eski mesaj temizlendi | Cache boyutu: ${msgCache.size}`);
   }
-}, 60 * 60 * 1000); // Saatte bir çalış
+}, 30 * 60 * 1000); // 30 dakikada bir
 
-console.log('[MSG_CACHE] ✅ Global cache sistemi başlatıldı');
+console.log('[MSG_CACHE] ✅ Cache sistemi başlatıldı');
 
 /**
  * Mesajı cache'e ekle (messageCreate event'inde çağrılır)
@@ -137,14 +140,15 @@ function cacheMessage(message) {
 
   msgCache.set(message.id, msgData);
   
-  // Cache boyutu 5000'i aşarsa, en eski mesajları temizle
-  if (msgCache.size > 5000) {
-    const entriesToDelete = msgCache.size - 5000;
+  // Cache boyutu aşarsa, en eski mesajları temizle
+  if (msgCache.size > MAX_CACHE_SIZE) {
+    const entriesToDelete = msgCache.size - MAX_CACHE_SIZE;
     const entries = Array.from(msgCache.entries());
     entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
     for (let i = 0; i < entriesToDelete; i++) {
       msgCache.delete(entries[i][0]);
     }
+    console.log(`[CACHE] Size limit ulaşıldı, ${entriesToDelete} mesaj silindi`);
   }
 }
 
@@ -623,24 +627,32 @@ async function syncTagRole(member) {
 
 function trackSpam(userId, type) {
   const now = Date.now();
-  const tracker = spamTracker.get(userId) || { 
-    messages: [], 
-    links: [], 
-    emojis: [], 
-    warnings: 0,
-    lastCheck: now 
-  };
+  let tracker = spamTracker.get(userId);
   
-  // 10 saniyeden eski olanları sil
-  tracker.messages = tracker.messages.filter(t => now - t < 5000); // 5 saniye pencerim
+  if (!tracker) {
+    tracker = { 
+      messages: [], 
+      links: [], 
+      emojis: [],
+      warnings: 0,
+      lastCheck: now,
+      lastWarning: 0
+    };
+  }
+  
+  // 5 saniyeden eski olanları sil
+  tracker.messages = tracker.messages.filter(t => now - t < 5000);
   tracker.links = tracker.links.filter(t => now - t < 10000);
   tracker.emojis = tracker.emojis.filter(t => now - t < 5000);
   
+  // Yeni aktiviteyi ekle
   if (type === 'message') tracker.messages.push(now);
   if (type === 'link') tracker.links.push(now);
   if (type === 'emoji') tracker.emojis.push(now);
   
+  tracker.lastCheck = now;
   spamTracker.set(userId, tracker);
+  
   return tracker;
 }
 
@@ -1535,46 +1547,68 @@ client.on('messageDelete', async (message) => {
   if (!isAllowedGuild(message.guild)) return;
 
   try {
-    // Discord cache'den al, yoksa custom cache'den
-    let authorTag = message.author?.tag;
-    let authorId = message.author?.id;
-    let messageContent = message.content;
-    let authorAvatar = message.author?.displayAvatarURL?.({ size: 256 });
+    // 1. DISCORD CACHE'DEN AL
+    let author = {
+      tag: message.author?.tag,
+      id: message.author?.id,
+      avatar: message.author?.displayAvatarURL?.({ size: 256 })
+    };
+    
+    let content = message.content;
+    let attachmentCount = message.attachments?.size || 0;
 
-    // Eğer veri eksikse, cache'den al
-    if (!authorId || !messageContent) {
+    // 2. EKSIK VERI VARSA CUSTOM CACHE'DEN AL
+    if (!author.id || !author.tag || !content) {
       const cached = getCachedMessage(message.id);
       if (cached) {
-        authorId = authorId || cached.authorId;
-        authorTag = authorTag || cached.authorTag;
-        messageContent = messageContent || cached.content;
-        authorAvatar = authorAvatar || cached.authorAvatar;
+        author.tag = author.tag || cached.authorTag;
+        author.id = author.id || cached.authorId;
+        author.avatar = author.avatar || cached.authorAvatar;
+        content = content || cached.content;
       }
     }
 
-    // Fallback
-    if (!authorId) {
-      authorId = 'Bilinmiyor';
-      authorTag = 'Bilinmiyor';
-    }
-    if (!messageContent) {
-      messageContent = '(içerik alınamadı)';
+    // 3. FALLBACK - HİÇ KOŞULDA BOŞ KALMASIN
+    if (!author.id) author.id = message.author?.id || 'bilinmiyor';
+    if (!author.tag) author.tag = message.author?.tag || `ID: ${author.id}`;
+    if (!content) content = '(içerik bulunamadı)';
+
+    // 4. SILEN KİŞİYİ BULMAYA ÇALIŞ (audit log)
+    let deletedByUser = null;
+    try {
+      const auditLogs = await message.guild.fetchAuditLogs({
+        limit: 3,
+        type: AuditLogEvent.MessageDelete
+      }).catch(() => null);
+
+      if (auditLogs?.entries?.size > 0) {
+        const entry = auditLogs.entries.find(e => 
+          Date.now() - e.createdTimestamp < 5000 && 
+          e.targetId === message.author?.id
+        );
+        if (entry?.executor) {
+          deletedByUser = entry.executor.tag;
+        }
+      }
+    } catch (err) {
+      // Sessizce geç
     }
 
-    const contentDisplay = safeTruncate(messageContent, 400);
-
-    // Embed basit ve temiz
+    // 5. EMBED OLUŞTUR
+    const contentDisplay = safeTruncate(content, 350);
     const embed = baseEmbed('🗑️ Mesaj Silindi', 0xed4245)
       .setDescription(
         `📝 **İçerik:** ${contentDisplay}\n` +
-        `👤 **Yazar:** ${authorTag}\n` +
-        `📍 **Kanal:** <#${message.channelId}>`
+        `👤 **Yazar:** ${author.tag}\n` +
+        `📍 **Kanal:** <#${message.channelId}>` +
+        `${deletedByUser ? `\n⚙️ **Silen:** ${deletedByUser}` : ''}`
       );
 
-    if (authorAvatar) {
-      embed.setThumbnail(authorAvatar);
+    if (author.avatar) {
+      embed.setThumbnail(author.avatar);
     }
 
+    // 6. GÖNDER
     await sendToChannel(client, cfg.logChannels.general, { embeds: [embed] });
     msgCache.delete(message.id);
 
