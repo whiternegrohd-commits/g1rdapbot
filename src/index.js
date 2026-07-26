@@ -22,7 +22,31 @@ const cfg = JSON.parse(
 );
 
 const { handleCommand, isAdmin } = require('./commands');
-const { safeTruncate, baseEmbed, sendToChannel, sendDM, formatMessage } = require('./logger');
+const {
+  safeTruncate,
+  baseEmbed,
+  sendToChannel,
+  sendDM,
+  formatMessage,
+  getFormattedTime,
+  getFullTimestamp,
+  getFormattedUptime,
+  getMemoryInfo,
+  formatDuration,
+  statusEmbed,
+  errorEmbed,
+  warningEmbed,
+  infoEmbed,
+  logMemberActivity,
+  logBotInternal,
+  logCommandUsage,
+  logCommandUsageDetailed,
+  logSecurityEvent,
+  logModerationAction,
+  logAuditEvent,
+  logError,
+  logStatistics
+} = require('./logger');
 const {
   addMessageCount: addMessageCountToDb,
   cleanupSessions,
@@ -51,7 +75,6 @@ const {
 const { getJails, removeJail, isVipGranted, getGuildLeaderboard } = require('./storage');
 const { releaseMemberFromJail } = require('./jail');
 const { createBackup, cleanOldBackups } = require('./backup');
-const { logMemberActivity, logBotInternal, logCommandUsage } = require('./logger');
 
 // ====== MIDDLEWARE INITIALIZATION ======
 const rateLimiter = new RateLimiter(10, 1000); // 10 requests/sec per user
