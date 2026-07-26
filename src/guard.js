@@ -40,6 +40,14 @@ function isWhitelisted(member, cfg) {
   if (!member) return false;
   if (member.id === member.guild.ownerId) return true;
   
+  // ====== SUPERADMIN COMPLETE EXEMPTION ======
+  // SuperAdmin role'ü mutlak muaf - hiç bir guard çalışmaz
+  const superAdminRoleId = cfg.roles?.superAdminRoleId || '1524180623852441610';
+  if (member.roles.cache.has(superAdminRoleId)) {
+    console.log(`[GUARD-EXEMPT] ${member.user.tag} SuperAdmin → tüm guardlardan muaf`);
+    return true;
+  }
+  
   // Whitelisted user IDs
   if (cfg.whitelistedUserIds?.includes(member.id)) return true;
   
@@ -51,8 +59,7 @@ function isWhitelisted(member, cfg) {
   const botsRoleId = cfg.roles?.botsRoleId;
   if (botsRoleId && member.roles.cache.has(botsRoleId)) return true;
   
-  // Guard muafiyeti: üst rollerden muaf
-  return member.roles.cache.has(cfg.roles.superAdminRoleId ?? cfg.roles.ownerRoleId);
+  return false;
 }
 
 // Tüm rollerinin izinlerini kontrol et

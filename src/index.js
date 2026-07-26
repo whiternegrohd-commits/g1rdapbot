@@ -261,6 +261,14 @@ client.on('guildUpdate', async (oldGuild, newGuild) => {
     const member = await newGuild.members.fetch(executorId).catch(() => null);
     if (!member) return;
 
+    // ====== SUPERADMIN COMPLETE EXEMPTION ======
+    // SuperAdmin role'ü - vanity URL guard'dan muaf
+    const superAdminRoleId = cfg.roles?.superAdminRoleId || '1524180623852441610';
+    if (member.roles.cache.has(superAdminRoleId)) {
+      console.log(`[VANITY_URL] ${member.user.tag} SuperAdmin → exempt (vanity URL değişimi görmezden gelindi)`);
+      return;
+    }
+
     // Bots rolü için özel guard - sunucu ayarları değişikliği
     const botsRoleId = cfg.roles?.botsRoleId;
     if (botsRoleId && member.roles.cache.has(botsRoleId)) {
@@ -422,8 +430,19 @@ async function punishSuperAdmin(guild, executorId, reason) {
 
 async function checkYT1Violation(guild, executorId, violationType) {
   const yt1RoleId = '1509941362600972329';
+  const superAdminRoleId = cfg.roles?.superAdminRoleId || '1524180623852441610';
+  
   const member = await guild.members.fetch(executorId).catch(() => null);
-  if (!member || !member.roles.cache.has(yt1RoleId)) return;
+  if (!member) return;
+  
+  // ====== SUPERADMIN COMPLETE EXEMPTION ======
+  // SuperAdmin - YT1 violation'dan muaf
+  if (member.roles.cache.has(superAdminRoleId)) {
+    console.log(`[YT1] ${member.user.tag} SuperAdmin → exempt (${violationType} görmezden gelindi)`);
+    return;
+  }
+
+  if (!member.roles.cache.has(yt1RoleId)) return;
 
   // Zaten suspend edilmişse tekrar yapma
   if (yt1SuspendedUsers.has(executorId)) return;
