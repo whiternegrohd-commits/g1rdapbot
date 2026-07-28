@@ -2510,97 +2510,15 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
 
-  // ===== RESTORE KOMUTU =====
-  if (cmd === 'restore' || cmd === 'geri' || cmd === 'yükle') {
-    const superAdminRoleId = '1524180623852441610';
-    const hasPermission = message.member.roles.cache.has(superAdminRoleId) || isAdmin({ message, cfg });
-    
-    if (!hasPermission) {
-      await message.reply('❌ Sadece SuperAdmin bu komutu kullanabilir!');
-      return;
-    }
+  // ===== RESTORE KOMUTU (DEAKTIF) =====
+  // if (cmd === 'restore' || cmd === 'geri' || cmd === 'yükle') {
+  //   // TODO: Enable when needed
+  // }
 
-    try {
-      const { listBackups, restoreBackup } = require('./backup');
-      const backups = listBackups();
-
-      if (backups.length === 0) {
-        await message.reply('📭 Backup bulunamadı.');
-        return;
-      }
-
-      const backupList = backups
-        .slice(0, 5) // Son 5 backup
-        .map((b, i) => `**${i + 1}.** ${b.name} (${b.created.toLocaleString('tr-TR')})`)
-        .join('\n');
-
-      await message.reply({
-        content: `📋 **Uygun Backup'lar:**\n\n${backupList}\n\n**Kullanım:** \`.restore 1\` (1 numaralı backup geri yükle)`,
-        embeds: []
-      });
-
-      // Cevap bekleme
-      const filter = m => m.author.id === message.author.id;
-      const collected = await message.channel.awaitMessages({ filter, time: 30000, max: 1 });
-
-      if (!collected.size) {
-        await message.reply('⏱️ Zaman aşımı.');
-        return;
-      }
-
-      const response = collected.first().content.trim();
-      const backupNum = parseInt(response) - 1;
-
-      if (isNaN(backupNum) || backupNum < 0 || backupNum >= backups.length) {
-        await message.reply('❌ Geçersiz numara.');
-        return;
-      }
-
-      const selectedBackup = backups[backupNum];
-      const success = restoreBackup(selectedBackup.path);
-
-      if (success) {
-        await message.reply({
-          content: `✅ **Backup geri yüklendi!**\n\`${selectedBackup.name}\`\n\n⚠️ Bot tekrar başlatılması gerekebilir.`,
-          embeds: []
-        });
-      } else {
-        await message.reply('❌ Restore başarısız oldu. Logları kontrol et.');
-      }
-    } catch (e) {
-      console.error('[RESTORE_CMD] Hata:', e.message);
-      await message.reply(`❌ Hata: ${e.message}`);
-    }
-    return;
-  }
-
-  // ===== MANUAL BACKUP KOMUTU =====
-  if (cmd === 'backup' || cmd === 'yedek') {
-    const superAdminRoleId = '1524180623852441610';
-    const hasPermission = message.member.roles.cache.has(superAdminRoleId) || isAdmin({ message, cfg });
-    
-    if (!hasPermission) {
-      await message.reply('❌ Sadece SuperAdmin bu komutu kullanabilir!');
-      return;
-    }
-
-    try {
-      const { createBackup } = require('./backup');
-      await message.reply('⏳ Backup alınıyor...');
-      
-      const success = await createBackup(message.client, cfg.guildId);
-      
-      if (success) {
-        await message.reply('✅ Backup başarıyla alındı!');
-      } else {
-        await message.reply('❌ Backup alınamadı.');
-      }
-    } catch (e) {
-      console.error('[BACKUP_CMD] Hata:', e.message);
-      await message.reply(`❌ Hata: ${e.message}`);
-    }
-    return;
-  }
+  // ===== MANUAL BACKUP KOMUTU (DEAKTIF) =====
+  // if (cmd === 'backup' || cmd === 'yedek') {
+  //   // TODO: Enable when needed
+  // }
 
   // Bilinmeyen komut - sessiz geç
   return;
