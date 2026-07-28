@@ -1844,59 +1844,6 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
 
-  if (cmd === 'girdapwlc') {
-    // Kullanıcı izin kontrolü
-    const allowedRoles = cfg.girdapwlcAllowedRoles || [];
-    const hasPermission = allowedRoles.some(roleId => message.member.roles.cache.has(roleId));
-    
-    if (!hasPermission) {
-      return message.reply('Bu komutu sadece yetkili roller kullanabilir.');
-    }
-
-    const user = parseUserFromMessage(message, args);
-    if (!user) return message.reply('Kullanım: `.girdapwlc @uye` veya `.girdapwlc <userId>`');
-    
-    const member = await fetchMember(message.guild, user);
-    if (!member) return message.reply('Üye bulunamadı.');
-
-    const wlcRoles = cfg.girdapwlcRoles || [];
-    if (wlcRoles.length === 0) {
-      return message.reply('Whitelist rolleri ayarlı değil.');
-    }
-
-    const alreadyHasAll = wlcRoles.every(roleId => member.roles.cache.has(roleId));
-    if (alreadyHasAll) {
-      await message.reply({ embeds: [baseEmbed('⚠️ BİLGİ', 0xffa500).setDescription(`${member} zaten tüm whitelist rollerine sahip.`)] });
-      return;
-    }
-
-    try {
-      await member.roles.add(wlcRoles, `Girdap WLC tarafından yapıldı`);
-      const roleList = wlcRoles.map(id => `<@&${id}>`).join(', ');
-      
-      await message.reply({
-        embeds: [
-          baseEmbed('✅ WHİTELİST ROLLERI VERİLDİ', 0x00ff00)
-            .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-            .setDescription(
-              `👤 **Üye:** ${member}\n` +
-              `📋 **Roller:**\n${wlcRoles.map(id => `• <@&${id}>`).join('\n')}\n` +
-              `👮 **Yetkili:** ${message.author}`
-            )
-            .setColor(0x00ff00)
-            .setFooter({ text: `${new Date().toLocaleTimeString('tr-TR')}` })
-        ]
-      });
-      
-      // Log
-      const logMsg = formatMessage('✅', 'Whitelist Rolleri Verildi', `Üye: ${member}\nYetkili: ${message.author}\nRoller: ${roleList}`);
-      await sendToChannel(_client, cfg.logChannels.general, logMsg);
-    } catch (e) {
-      await message.reply(`❌ Roller verilemedi: ${e.message}`);
-    }
-    return;
-  }
-
   if (cmd === 'uykumoduac') {
     const fullAdminRoleId = '1510665683275616427';
     const ownerId = '588050048882049035';
