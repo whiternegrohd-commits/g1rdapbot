@@ -382,8 +382,11 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
 
-  // Kanal kontrolü
-  if (cfg.commandsChannelId && message.channelId !== cfg.commandsChannelId && !isAllowedEverywhere) {
+  // Kanal kontrolü (PURGE hariç - her kanalda çalışabilir)
+  const purgeCommands = ['purge', 'temizle'];
+  const isPurgeCommand = purgeCommands.includes(cmd);
+  
+  if (cfg.commandsChannelId && message.channelId !== cfg.commandsChannelId && !isAllowedEverywhere && !isPurgeCommand) {
     // Commands kanalı dışında ve izin verilen komutlardan değilse
     if (isAdminCommand || !isAllowedEverywhere) {
       // Rolleri kontrol et - sadece belirtilen rollerde diğer komutlar çalışabilir

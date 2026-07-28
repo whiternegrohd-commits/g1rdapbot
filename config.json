@@ -21,8 +21,8 @@
   },
   "commandPermissions": {
     "supreme": ["ban", "forceban", "unban", "jail", "unjail", "warn", "unwarn", "clearwarns", "kick", "timeout", "untimeout", "vip", "unvip", "yt1", "yt2", "ytaç", "lock", "unlock", "purge", "temizle", "foto", "emektar", "uykumoduac", "uykumodukapat", "topludm"],
-    "bots": ["ban", "forceban", "unban", "jail", "unjail", "unmute", "timeout", "untimeout", "vip", "unvip", "yt1", "yt2", "ytaç", "lock", "unlock"],
-    "owner": ["ban", "forceban", "unban", "jail", "unjail", "kick", "timeout", "untimeout", "vip", "unvip", "yt1", "yt2", "ytaç", "lock", "unlock", "warn", "unwarn"],
+    "bots": ["ban", "forceban", "unban", "jail", "unjail", "unmute", "timeout", "untimeout", "vip", "unvip", "yt1", "yt2", "ytaç", "lock", "unlock", "purge", "temizle"],
+    "owner": ["ban", "forceban", "unban", "jail", "unjail", "kick", "timeout", "untimeout", "vip", "unvip", "yt1", "yt2", "ytaç", "lock", "unlock", "warn", "unwarn", "purge", "temizle"],
     "public": ["diss", "ship", "stat", "snipe", "say", "help", "url", "fullyt"]
   },
   "commandsOnlyRoles": {
