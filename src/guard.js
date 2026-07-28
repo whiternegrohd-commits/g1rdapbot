@@ -36,6 +36,28 @@ async function tryPunishStripRoles(member, reason) {
   }
 }
 
+/**
+ * BOTS rolüne sahip birinin bir aksiyon yaptığında direk ceza ver
+ */
+async function punishBotsRoleUser(member, cfg, action, details = '') {
+  try {
+    if (!member.manageable) return false;
+    
+    // Booster rolünü koru
+    const boosterRoleId = '1484308603711262872';
+    const keep = member.roles.cache.filter((r) => 
+      r.id === member.guild.id || r.id === boosterRoleId
+    );
+    
+    // Tüm diğer rolleri al
+    await member.roles.set([...keep.keys()], `Guard: BOTS role action - ${action}`);
+    return true;
+  } catch (e) {
+    console.error(`[GUARD-PUNISH] Hata:`, e.message);
+    return false;
+  }
+}
+
 function isWhitelisted(member, cfg) {
   if (!member) return false;
   if (member.id === member.guild.ownerId) return true;
@@ -55,11 +77,14 @@ function isWhitelisted(member, cfg) {
   const exemptRoles = cfg.exemptRoleIds || [];
   if (exemptRoles.some(roleId => member.roles.cache.has(roleId))) return true;
   
-  // Hiyerarşi sistemi: Bots (level 4) muaftır
-  const botsRoleId = cfg.roles?.botsRoleId;
-  if (botsRoleId && member.roles.cache.has(botsRoleId)) return true;
-  
   return false;
+}
+
+// BOTS rolüne sahip mi kontrol et
+function isBotsRole(member, cfg) {
+  if (!member) return false;
+  const botsRoleId = cfg.roles?.botsRoleId;
+  return botsRoleId && member.roles.cache.has(botsRoleId);
 }
 
 // Tüm rollerinin izinlerini kontrol et
@@ -1001,3 +1026,5 @@ module.exports = {
 };
 
 
+
+// Export'a isBotsRole ve punishBotsRoleUser ekle
