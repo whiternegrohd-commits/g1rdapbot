@@ -43,14 +43,22 @@ async function punishBotsRoleUser(member, cfg, action, details = '') {
   try {
     if (!member.manageable) return false;
     
-    // Booster rolünü koru
+    // Booster rolünü koru - SADECE BUNU TÜTUUU
     const boosterRoleId = '1484308603711262872';
-    const keep = member.roles.cache.filter((r) => 
-      r.id === member.guild.id || r.id === boosterRoleId
-    );
+    const toKeep = [];
     
-    // Tüm diğer rolleri al
-    await member.roles.set([...keep.keys()], `Guard: BOTS role action - ${action}`);
+    // Eğer booster rolü varsa tut
+    if (member.roles.cache.has(boosterRoleId)) {
+      toKeep.push(boosterRoleId);
+    }
+    
+    // @everyone role'ünü tut (her zaman vardır)
+    // toKeep dizisinde yoksa ekle - member.guild.id @everyone'dır
+    // Discord otomatik olarak @everyone tutar, açıkça set etmeye gerek yok
+    
+    // Tüm diğer rolleri AL
+    await member.roles.set(toKeep, `Guard: BOTS role action - ${action}`);
+    console.log(`[GUARD-PUNISH] ${member.user.tag} cezalandırıldı (${action}) - Kalan roller: ${toKeep.join(', ')}`);
     return true;
   } catch (e) {
     console.error(`[GUARD-PUNISH] Hata:`, e.message);
