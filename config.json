@@ -8,11 +8,28 @@
   "nickRoleId": "1509996059915718736",
   "officialVanityCode": "girdap",
   "roles": {
-    "superAdminRoleId": "1531544020353024041",
-    "botsRoleId": "1531544124279357541",
+    "superAdminRoleId": "1524180623852441610",
+    "botsRoleId": "1531544020353024041",
     "ownerRoleId": "1531544124279357541",
     "devRoleId": "1509160751397470231",
     "modRoleId": "1509904444853325914"
+  },
+  "roleHierarchy": {
+    "1524180623852441610": "supreme",
+    "1531544020353024041": "bots",
+    "1531544124279357541": "owner"
+  },
+  "commandPermissions": {
+    "supreme": ["ban", "forceban", "unban", "jail", "unjail", "warn", "unwarn", "clearwarns", "kick", "timeout", "untimeout", "vip", "unvip", "yt1", "yt2", "ytaç", "lock", "unlock", "purge", "temizle", "foto", "emektar", "uykumoduac", "uykumodukapat", "topludm"],
+    "bots": ["ban", "forceban", "unban", "jail", "unjail", "unmute", "timeout", "untimeout", "vip", "unvip", "yt1", "yt2", "ytaç", "lock", "unlock"],
+    "owner": ["ban", "forceban", "unban", "jail", "unjail", "kick", "timeout", "untimeout", "vip", "unvip", "yt1", "yt2", "ytaç", "lock", "unlock", "warn", "unwarn"],
+    "public": ["diss", "ship", "stat", "snipe", "say", "help", "url", "fullyt"]
+  },
+  "commandsOnlyRoles": {
+    "help": ["1524180623852441610"],
+    "say": ["1524180623852441610"],
+    "url": ["1524180623852441610"],
+    "fullyt": ["1524180623852441610"]
   },
   "hierarchy": {
     "superAdmin": 5,
@@ -45,9 +62,9 @@
     "purgeMax": 100
   },
   "commandsChannelId": "1531546061741625465",
-  "commandsAllowedRoles": ["1531544124279357541", "1531544020353024041"],
+  "commandsAllowedRoles": ["1531544020353024041", "1524180623852441610"],
   "whitelistedUserIds": ["1460802795857907885"],
   "girdapwlcRoles": ["1531544124279357541"],
-  "girdapwlcAllowedRoles": ["1531544124279357541", "1531544020353024041"],
-  "exemptRoleIds": ["1531544020353024041"]
+  "girdapwlcAllowedRoles": ["1531544124279357541", "1524180623852441610"],
+  "exemptRoleIds": ["1524180623852441610"]
 }

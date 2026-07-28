@@ -97,7 +97,6 @@ const dissLines = [
 ];
 
 
-// Hiyerarşi seviyesi al
 function getHierarchyLevel(member, cfg) {
   if (!member) return 0;
   
@@ -355,29 +354,32 @@ async function handleCommand({ client, message, cfg }) {
   
   const isAdminCommand = adminCommands.includes(cmd);
 
-  // ===== ADMIN KOMUTLAR İÇİN ROL KONTROLÜ =====
-  if (isAdminCommand) {
-    const superAdminRoleId = cfg.roles?.superAdminRoleId;
-    const hasAdminRole = superAdminRoleId && message.member.roles.cache.has(superAdminRoleId);
-    
-    // uykumoduac ve topludm hariç tüm admin komutlar için kontrol
-    const restrictedAdminCommands = ['uykumoduac', 'topludm'];
-    const isRestricted = restrictedAdminCommands.includes(cmd);
-    
-    if (isRestricted) {
-      // Bu komutlar sadece belirtilen rollere + specific kullanıcılara
-      const ownerId = '588050048882049035';
-      if (message.author.id !== ownerId && !hasAdminRole) {
-        await message.reply('❌ Bu komutu kullanmak için yetkin yok.');
-        return;
-      }
-    } else {
-      // Diğer admin komutlar - superAdmin rolü gerekli
-      if (!hasAdminRole) {
-        await message.reply(`❌ Bu komutu kullanmak için <@&${superAdminRoleId}> rolü gerekli!`);
-        return;
-      }
-    }
+  // ===== YENİ YETKİLENDİRME SİSTEMİ =====
+  const superAdminRoleId = cfg.roles?.superAdminRoleId;
+  const botsRoleId = cfg.roles?.botsRoleId;
+  const ownerRoleId = cfg.roles?.ownerRoleId;
+
+  // Kullanıcının rolünü belirle
+  let userTier = 'public';
+  if (message.member.roles.cache.has(superAdminRoleId)) {
+    userTier = 'supreme';
+  } else if (message.member.roles.cache.has(botsRoleId)) {
+    userTier = 'bots';
+  } else if (message.member.roles.cache.has(ownerRoleId)) {
+    userTier = 'owner';
+  }
+
+  // Config'ten komut izinlerini al
+  const permissions = cfg.commandPermissions || {};
+  const tierCommands = permissions[userTier] || [];
+  const publicCommands = permissions['public'] || [];
+
+  // Komut kontrolü yap
+  const isCommandAllowed = tierCommands.includes(cmd) || publicCommands.includes(cmd);
+  
+  if (isAdminCommand && !isCommandAllowed) {
+    await message.reply(`❌ Bu komutu kullanmak için gerekli rolle sahip değilsin!`);
+    return;
   }
 
   // Kanal kontrolü
