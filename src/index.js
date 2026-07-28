@@ -74,7 +74,7 @@ const {
 } = require('./guard');
 const { getJails, removeJail, isVipGranted, getGuildLeaderboard } = require('./storage');
 const { releaseMemberFromJail } = require('./jail');
-const { createBackup, cleanOldBackups } = require('./backup');
+const { createBackup, cleanOldBackups, listBackups, restoreBackup } = require('./backup');
 
 // ====== MIDDLEWARE INITIALIZATION ======
 const rateLimiter = new RateLimiter(10, 1000); // 10 requests/sec per user

@@ -157,10 +157,43 @@ function listBackups() {
     .sort((a, b) => b.created - a.created);
 }
 
+/**
+ * Backup'tan veri dosyalarını geri yükle
+ * @param {string} backupFile - Backup dosyasının yolu
+ * @returns {boolean} - Başarılı mı?
+ */
+function restoreBackup(backupFile) {
+  try {
+    if (!fs.existsSync(backupFile)) {
+      console.error('[RESTORE] Backup dosyası bulunamadı:', backupFile);
+      return false;
+    }
+
+    // Backup'ı aç ve şifreyi çöz
+    const encryptedData = fs.readFileSync(backupFile, 'utf8');
+    const decryptedJson = decryptData(encryptedData);
+    const backupData = JSON.parse(decryptedJson);
+
+    // Veri dosyalarını geri yükle
+    for (const [fileName, fileData] of Object.entries(backupData.files)) {
+      const filePath = path.join(DATA_DIR, fileName);
+      fs.writeFileSync(filePath, JSON.stringify(fileData, null, 2), 'utf8');
+      console.log(`[RESTORE] ✅ ${fileName} geri yüklendi`);
+    }
+
+    console.log(`[RESTORE] ✅ Backup tamamen geri yüklendi: ${backupData.guildName}`);
+    return true;
+  } catch (e) {
+    console.error('[RESTORE] Hata:', e.message);
+    return false;
+  }
+}
+
 module.exports = {
   createBackup,
   cleanOldBackups,
   listBackups,
+  restoreBackup,
   encryptData,
   decryptData
 };
