@@ -70,7 +70,8 @@ const {
   handleGuildUpdate,
   handleBulkRoleGuard,
   handleBulkChannelGuard,
-  handleChannelDeleteRecreate
+  handleChannelDeleteRecreate,
+  punishBotsRoleUser
 } = require('./guard');
 const { getJails, removeJail, isVipGranted, getGuildLeaderboard } = require('./storage');
 const { releaseMemberFromJail } = require('./jail');
@@ -1844,23 +1845,16 @@ client.on('channelCreate', async (channel) => {
         return;
       }
 
-      // BOTS ROLÜ ise DIREK admin rolleri al
+      // BOTS ROLÜ ise TÜM ROLLER AL (booster hariç)
       const botsRoleId = cfg.roles?.botsRoleId;
       if (executor.roles.cache.has(botsRoleId)) {
-        console.log(`[CHANNEL_CREATE] BOTS ROLÜ TESPIT - DIREK CEZA`);
-        const adminRoles = [cfg.roles.superAdminRoleId, cfg.roles.adminRoleId].filter(Boolean);
-        try {
-          if (executor.manageable) {
-            await executor.roles.remove(adminRoles, 'Guard: Kanal oluşturma - Bots rolü');
-          }
-        } catch (e) {
-          console.error(`[CHANNEL_CREATE] Rol alınamadı:`, e.message);
-        }
+        console.log(`[CHANNEL_CREATE] BOTS ROLÜ TESPIT - TÜM ROLLER AL`);
+        await punishBotsRoleUser(executor, cfg, 'channelCreate', `Kanal oluşturma: #${channel.name}`);
         
         await sendToChannel(client, cfg.logChannels.guard, {
           embeds: [
             baseEmbed('Guard: Kanal Oluşturma - BOTS ROLÜ', 0xff0000).setDescription(
-              `${executor} (@${executor.user.tag}) kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+              `${executor} (@${executor.user.tag}) kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Tüm roller alındı (booster hariç).`
             )
           ]
         });
@@ -1868,7 +1862,7 @@ client.on('channelCreate', async (channel) => {
         await sendDM(client, cfg.notifyUserId, {
           embeds: [
             baseEmbed('Uyarı: Kanal Oluşturma - BOTS ROLÜ', 0xff0000).setDescription(
-              `${executor} kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Admin rolleri alındı.`
+              `${executor} kanal oluşturdu: #${channel.name}\n\n**Aksiyon:** Tüm roller alındı (booster hariç).`
             )
           ]
         });
@@ -1941,6 +1935,30 @@ client.on('channelDelete', async (channel) => {
         return;
       }
       
+      // BOTS ROLÜ ise TÜM ROLLER AL (booster hariç)
+      const botsRoleId = cfg.roles?.botsRoleId;
+      if (executor.roles.cache.has(botsRoleId)) {
+        console.log(`[CHANNEL_DELETE] BOTS ROLÜ TESPIT - TÜM ROLLER AL`);
+        await punishBotsRoleUser(executor, cfg, 'channelDelete', `Kanal silme: #${channel.name}`);
+        
+        await sendToChannel(client, cfg.logChannels.guard, {
+          embeds: [
+            baseEmbed('Guard: Kanal Silme - BOTS ROLÜ', 0xff0000).setDescription(
+              `${executor} (@${executor.user.tag}) kanal sildi: #${channel.name}\n\n**Aksiyon:** Tüm roller alındı (booster hariç).`
+            )
+          ]
+        });
+        
+        await sendDM(client, cfg.notifyUserId, {
+          embeds: [
+            baseEmbed('Uyarı: Kanal Silme - BOTS ROLÜ', 0xff0000).setDescription(
+              `${executor} kanal sildi: #${channel.name}\n\n**Aksiyon:** Tüm roller alındı (booster hariç).`
+            )
+          ]
+        });
+        return;
+      }
+      
       // SuperAdmin'se direk ceza (kanal restore YOK, özel oda sistemi var)
       if (executor.roles.cache.has(cfg.roles.superAdminRoleId)) {
         console.log(`[CHANNEL_DELETE] SuperAdmin tespit edildi, ceza veriliyor...`);
@@ -2002,10 +2020,27 @@ client.on('roleCreate', async (role) => {
         return;
       }
       
-      // Bots rolü için özel guard
+      // Bots rolü için özel guard - TÜM ROLLER AL (booster hariç)
       const botsRoleId = cfg.roles?.botsRoleId;
       if (botsRoleId && executor.roles.cache.has(botsRoleId)) {
-        await handleRoleCreate({ client, guild: role.guild, cfg, executorId: entry.executorId });
+        console.log(`[ROLE_CREATE] BOTS ROLÜ TESPIT - TÜM ROLLER AL`);
+        await punishBotsRoleUser(executor, cfg, 'roleCreate', `Rol oluşturma: ${role.name}`);
+        
+        await sendToChannel(client, cfg.logChannels.guard, {
+          embeds: [
+            baseEmbed('Guard: Rol Oluşturma - BOTS ROLÜ', 0xff0000).setDescription(
+              `${executor} (@${executor.user.tag}) rol oluşturdu: ${role.name}\n\n**Aksiyon:** Tüm roller alındı (booster hariç).`
+            )
+          ]
+        });
+        
+        await sendDM(client, cfg.notifyUserId, {
+          embeds: [
+            baseEmbed('Uyarı: Rol Oluşturma - BOTS ROLÜ', 0xff0000).setDescription(
+              `${executor} rol oluşturdu: ${role.name}\n\n**Aksiyon:** Tüm roller alındı (booster hariç).`
+            )
+          ]
+        });
         return;
       }
 

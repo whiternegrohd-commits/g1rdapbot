@@ -1022,6 +1022,8 @@ module.exports = {
   hasDangerousPermissions,
   handleChannelDeleteRecreate,
   isWhitelisted,
+  isBotsRole,
+  punishBotsRoleUser,
   AuditLogEvent
 };
 
