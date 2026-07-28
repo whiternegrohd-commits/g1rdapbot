@@ -29,7 +29,7 @@
     "general": "1531544938724982886",
     "guard": "1531544962825453618",
     "memberActivity": "1531544990721773720",
-    "botInternal": "1531545038884962374"
+    "botInternal": "1531545094547574865"
   },
   "emojis": {
     "success": "1486915679335612548",
@@ -44,7 +44,7 @@
   "limits": {
     "purgeMax": 100
   },
-  "commandsChannelId": "1531545094547574865",
+  "commandsChannelId": "1531546061741625465",
   "commandsAllowedRoles": ["1531544124279357541", "1531544020353024041"],
   "whitelistedUserIds": ["1460802795857907885"],
   "girdapwlcRoles": ["1531544124279357541"],
