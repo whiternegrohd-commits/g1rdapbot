@@ -66,5 +66,6 @@
   "whitelistedUserIds": ["1460802795857907885"],
   "girdapwlcRoles": ["1531544124279357541"],
   "girdapwlcAllowedRoles": ["1531544124279357541", "1524180623852441610"],
-  "exemptRoleIds": ["1524180623852441610"]
+  "exemptRoleIds": ["1524180623852441610"],
+  "afkChannelId": "1531561378819608636"
 }

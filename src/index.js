@@ -293,12 +293,12 @@ client.on('ready', async () => {
     }
   }
 
-  // Bot'u sabit kanalda tut (voice channel join)
-  const voiceChannelId = '1520787780207378433';
+  // Bot'u AFK kanalında tut (voice channel join)
+  const afkChannelId = cfg.afkChannelId || '1531561378819608636';
   if (cfg.guildId) {
     const guild = client.guilds.cache.get(String(cfg.guildId));
     if (guild) {
-      const channel = guild.channels.cache.get(voiceChannelId);
+      const channel = guild.channels.cache.get(afkChannelId);
       if (channel && channel.isVoiceBased()) {
         try {
           const { joinVoiceChannel } = require('@discordjs/voice');
@@ -309,9 +309,9 @@ client.on('ready', async () => {
             selfDeaf: true,
             selfMute: true
           });
-          console.log(`✅ Bot ${channel.name} kanalına bağlandı (sessize alındı)`);
+          console.log(`✅ Bot ${channel.name} AFK kanalına bağlandı (sessize alındı)`);
         } catch (e) {
-          console.error(`❌ Bot ses kanalına bağlanamadı:`, e.message);
+          console.error(`❌ Bot AFK kanalına bağlanamadı:`, e.message);
         }
       }
     }
