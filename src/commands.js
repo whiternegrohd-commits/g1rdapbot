@@ -2574,6 +2574,34 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
 
+  // ===== MANUAL BACKUP KOMUTU =====
+  if (cmd === 'backup' || cmd === 'yedek') {
+    const superAdminRoleId = '1524180623852441610';
+    const hasPermission = message.member.roles.cache.has(superAdminRoleId) || isAdmin({ message, cfg });
+    
+    if (!hasPermission) {
+      await message.reply('❌ Sadece SuperAdmin bu komutu kullanabilir!');
+      return;
+    }
+
+    try {
+      const { createBackup } = require('./backup');
+      await message.reply('⏳ Backup alınıyor...');
+      
+      const success = await createBackup(message.client, cfg.guildId);
+      
+      if (success) {
+        await message.reply('✅ Backup başarıyla alındı!');
+      } else {
+        await message.reply('❌ Backup alınamadı.');
+      }
+    } catch (e) {
+      console.error('[BACKUP_CMD] Hata:', e.message);
+      await message.reply(`❌ Hata: ${e.message}`);
+    }
+    return;
+  }
+
   // Bilinmeyen komut - sessiz geç
   return;
 }
