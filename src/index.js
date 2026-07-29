@@ -1261,56 +1261,6 @@ client.on('messageCreate', async (message) => {
 client.on('guildMemberAdd', async (member) => {
   if (!isAllowedGuild(member.guild)) return;
   
-  // BOT EKLEME KORUMASI
-  if (member.user.bot) {
-    try {
-      const logs = await member.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.BotAdd }).catch(() => null);
-      const entry = logs?.entries?.first();
-      const adderInfo = entry?.executor ? `${entry.executor.tag} (\`${entry.executor.id}\`)` : 'Bilinmeyen';
-      
-      // Bot'u atan kişi sahibi ya da full admin değilse, botu kick et
-      const fullAdminRoleId = '1510665683275616427';
-      const ownerId = '588050048882049035';
-      
-      const adder = entry?.executor;
-      if (adder && adder.id !== ownerId && !member.guild.members.cache.get(adder.id)?.roles.cache.has(fullAdminRoleId)) {
-        await member.kick('Yetkisiz bot ekleme').catch(() => {});
-        
-        await sendToChannel(client, cfg.logChannels.guard, {
-          embeds: [
-            baseEmbed('🚫 BOT EKLEME ENGELLEND İ', 0xff0000)
-              .setDescription(
-                `🤖 **Bot:** ${member.user.tag} (\`${member.id}\`)\n` +
-                `👤 **Ekleyen:** ${adderInfo}\n` +
-                `⚙️ **Aksiyon:** Bot sunucudan çıkarıldı\n` +
-                `📝 **Sebep:** Sadece sunucu sahibi veya Full Admin bot ekleyebilir\n` +
-                `📅 **Zaman:** \`${getFullTimestamp()}\``
-              )
-              .addFields(
-                {
-                  name: '🤖 Bot Bilgisi',
-                  value: `• **Bot ID:** \`${member.id}\`\n• **Bot Sahibi:** \`Bilinmiyor\``,
-                  inline: true
-                },
-                {
-                  name: '🛡️ Güvenlik Detayları',
-                  value: `• **Tehdit Seviyesi:** \`Yüksek\`\n• **Durum:** \`Bloklanmış\``,
-                  inline: true
-                }
-              )
-              .setFooter({
-                text: `━ Güvenlik Sistemi • ${getFullTimestamp()}`,
-                iconURL: client.user?.displayAvatarURL()
-              })
-          ]
-        });
-      }
-    } catch (e) {
-      console.error('[BOT_ADD] Hata:', e.message);
-    }
-    return;
-  }
-  
   // Cezalı mı kontrol et
   const jails = getJails(member.guild.id);
   if (jails[member.id]) {
