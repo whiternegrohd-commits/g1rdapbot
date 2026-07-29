@@ -355,7 +355,29 @@ client.on('ready', async () => {
 
 client.on('guildCreate', async (guild) => {
   if (!isAllowedGuild(guild)) {
-    console.log(`Davet reddedildi, ayrılıyor: ${guild.name} (${guild.id})`);
+    // Audit logs'tan davet eden kişiyi bul
+    try {
+      const logs = await guild.fetchAuditLogs({ limit: 3, type: AuditLogEvent.BotAdd }).catch(() => null);
+      if (logs) {
+        const botAddEntry = logs.entries.find(e => e.target?.id === client.user.id && Date.now() - e.createdTimestamp < 5000);
+        if (botAddEntry && botAddEntry.executorId) {
+          // Davet eden kişiyi fetch et
+          const inviter = await guild.members.fetch(botAddEntry.executorId).catch(() => null);
+          if (inviter) {
+            // SuperAdmin rolü kontrol et
+            const superAdminRoleId = cfg.roles?.superAdminRoleId || '1524180623852441610';
+            if (inviter.roles.cache.has(superAdminRoleId)) {
+              console.log(`✅ Bot ${guild.name}'ye SuperAdmin tarafından eklendi - kalıyor!`);
+              return; // BOT KALACAK
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error(`guildCreate audit log hatası:`, e.message);
+    }
+    
+    console.log(`❌ Davet reddedildi, ayrılıyor: ${guild.name} (${guild.id})`);
     await guild.leave().catch(() => {});
   }
 });
