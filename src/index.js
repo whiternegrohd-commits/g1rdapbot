@@ -382,6 +382,54 @@ client.on('guildCreate', async (guild) => {
   }
 });
 
+// Yetkisiz bot ekleme koruması
+client.on('guildMemberAdd', async (member) => {
+  // Sadece izin verilen sunucuda ve üye bot ise
+  if (!isAllowedGuild(member.guild) || !member.user.bot) return;
+  
+  try {
+    // Audit logs'tan bot ekleyeni bul
+    const logs = await member.guild.fetchAuditLogs({ limit: 5, type: AuditLogEvent.BotAdd }).catch(() => null);
+    if (!logs) return;
+    
+    const botAddEntry = logs.entries.find(e => 
+      e.target?.id === member.id && 
+      Date.now() - e.createdTimestamp < 5000
+    );
+    
+    if (botAddEntry && botAddEntry.executorId) {
+      const inviter = await member.guild.members.fetch(botAddEntry.executorId).catch(() => null);
+      if (!inviter) return;
+      
+      // SuperAdmin rolü var mı kontrol et
+      const superAdminRoleId = cfg.roles?.superAdminRoleId || '1524180623852441610';
+      if (inviter.roles.cache.has(superAdminRoleId)) {
+        console.log(`✅ Bot ${member.user.tag} SuperAdmin tarafından eklendi - kalıyor`);
+        return; // BOT KALACAK
+      }
+      
+      // SuperAdmin değilse BOTu hemen kickle
+      console.log(`🚫 Bot ${member.user.tag} yetkisiz eklenme tespit edildi - kickleniyor`);
+      await member.kick('Yetkisiz bot ekleme').catch(() => {});
+      
+      // Log yaz
+      await sendToChannel(client, cfg.logChannels.guard, {
+        embeds: [
+          baseEmbed('🚫 YETKİSİZ BOT EKLENMESİ ENGELLENDİ', 0xff0000)
+            .setDescription(
+              `**Bot:** ${member.user.tag} (\`${member.id}\`)\n` +
+              `**Ekleyen:** ${inviter.user.tag} (\`${inviter.id}\`)\n` +
+              `**Aksiyon:** Bot kicklendi\n` +
+              `**Zaman:** \`${new Date().toLocaleTimeString('tr-TR')}\``
+            )
+        ]
+      });
+    }
+  } catch (e) {
+    console.error(`[BOT_ADD_GUARD] Hata:`, e.message);
+  }
+});
+
 // Vanity URL değişikliği koruması: muaf değilse rol kırp + DM + GERI YAZ
 client.on('guildUpdate', async (oldGuild, newGuild) => {
   if (!isAllowedGuild(newGuild)) return;
