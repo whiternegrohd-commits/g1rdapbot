@@ -1261,6 +1261,50 @@ client.on('messageCreate', async (message) => {
 client.on('guildMemberAdd', async (member) => {
   if (!isAllowedGuild(member.guild)) return;
   
+  // BOT EKLEME KORUMASI - Sadece SuperAdmin ekleyebilsin
+  if (member.user.bot) {
+    try {
+      const logs = await member.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.BotAdd }).catch(() => null);
+      const entry = logs?.entries?.first();
+      
+      if (entry && entry.executorId) {
+        const adder = await member.guild.members.fetch(entry.executorId).catch(() => null);
+        if (!adder) return;
+        
+        // SuperAdmin rolü kontrol et
+        const superAdminRoleId = cfg.roles?.superAdminRoleId || '1524180623852441610';
+        if (adder.roles.cache.has(superAdminRoleId)) {
+          console.log(`✅ Bot ${member.user.tag} SuperAdmin tarafından eklendi - kalıyor`);
+          return; // BOT KALACAK
+        }
+        
+        // SuperAdmin değilse BOTu hemen kickle
+        console.log(`🚫 Bot ${member.user.tag} yetkisiz eklenme tespit edildi - kickleniyor`);
+        await member.kick('Yetkisiz bot ekleme').catch(() => {});
+        
+        await sendToChannel(client, cfg.logChannels.guard, {
+          embeds: [
+            baseEmbed('🚫 YETKİSİZ BOT EKLENMESİ ENGELLENDİ', 0xff0000)
+              .setDescription(
+                `🤖 **Bot:** ${member.user.tag} (\`${member.id}\`)\n` +
+                `👤 **Ekleyen:** ${adder.user.tag} (\`${adder.id}\`)\n` +
+                `⚙️ **Aksiyon:** Bot kicklendi\n` +
+                `📝 **Sebep:** Sadece SuperAdmin bot ekleyebilir\n` +
+                `📅 **Zaman:** \`${getFullTimestamp()}\``
+              )
+              .setFooter({
+                text: `━ Güvenlik Sistemi • ${getFullTimestamp()}`,
+                iconURL: client.user?.displayAvatarURL()
+              })
+          ]
+        });
+      }
+    } catch (e) {
+      console.error('[BOT_ADD] Hata:', e.message);
+    }
+    return;
+  }
+  
   // Cezalı mı kontrol et
   const jails = getJails(member.guild.id);
   if (jails[member.id]) {
