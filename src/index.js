@@ -382,7 +382,7 @@ client.on('guildCreate', async (guild) => {
   }
 });
 
-// Yetkisiz bot ekleme koruması
+// Yetkisiz bot ekleme koruması (GEÇICI OLARAK DEvre DIŞI)
 client.on('guildMemberAdd', async (member) => {
   // Sadece izin verilen sunucuda ve üye bot ise
   if (!isAllowedGuild(member.guild) || !member.user.bot) return;
@@ -408,6 +408,8 @@ client.on('guildMemberAdd', async (member) => {
         return; // BOT KALACAK
       }
       
+      // GEÇICI OLARAK DEVRE DIŞI - Bot ekleme yapılırken
+      /*
       // SuperAdmin değilse BOTu hemen kickle
       console.log(`🚫 Bot ${member.user.tag} yetkisiz eklenme tespit edildi - kickleniyor`);
       await member.kick('Yetkisiz bot ekleme').catch(() => {});
@@ -424,6 +426,7 @@ client.on('guildMemberAdd', async (member) => {
             )
         ]
       });
+      */
     }
   } catch (e) {
     console.error(`[BOT_ADD_GUARD] Hata:`, e.message);
