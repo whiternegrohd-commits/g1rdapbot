@@ -2487,6 +2487,201 @@ async function handleCommand({ client, message, cfg }) {
     return;
   }
 
+  // ===== ÇEK KOMUTU - Kullanıcıyı Yanına Çek =====
+  if (cmd === 'çek') {
+    // Yetki kontrolü - Admin+ gerekli
+    if (!canUseAdminCommand(message.member, cfg)) {
+      await message.reply('❌ Bu komutu kullanmak için yetkin yok (Admin+ gerekli).');
+      return;
+    }
+
+    const target = parseUserFromMessage(message, args);
+    if (!target) {
+      await message.reply('❌ Kullanıcı etiketle veya ID yaz. Kullanım: `.çek @user`');
+      return;
+    }
+
+    // Executor ses kanalında mı?
+    if (!message.member.voice.channel) {
+      await message.reply('❌ Sen ses kanalında değilsin.');
+      return;
+    }
+
+    // Target user'ı fetch et
+    const targetMember = await fetchMember(message.guild, target);
+    if (!targetMember) {
+      await message.reply('❌ Kullanıcı bulunamadı.');
+      return;
+    }
+
+    // Target ses kanalında mı?
+    if (!targetMember.voice.channel) {
+      await message.reply(`❌ <@${targetMember.id}> ses kanalında değil.`);
+      return;
+    }
+
+    // Executor'un kanalı
+    const sourceChannel = message.member.voice.channel;
+    const targetChannel = targetMember.voice.channel;
+
+    try {
+      // Kullanıcıyı çek
+      await targetMember.voice.setChannel(sourceChannel, 'Çek komutu kullanıldı');
+
+      // Başarı mesajı
+      await message.reply({
+        embeds: [
+          baseEmbed('✅ ÜYE ÇEKİLDİ', 0x0099ff)
+            .setDescription(`<@${targetMember.id}> çekildi!`)
+            .addFields(
+              { name: '👤 Çekilen', value: `${targetMember.user.tag} (\`${targetMember.id}\`)`, inline: true },
+              { name: '📍 Kaynak Kanal', value: `${targetChannel.name} (\`${targetChannel.id}\`)`, inline: true },
+              { name: '📍 Hedef Kanal', value: `${sourceChannel.name} (\`${sourceChannel.id}\`)`, inline: true },
+              { name: '👤 Çeken', value: `${message.author.tag} (\`${message.author.id}\`)`, inline: true },
+              { name: '⏱️ Zaman', value: `\`${new Date().toLocaleTimeString('tr-TR')}\``, inline: true },
+              { name: '🎤 Kanal Durumu', value: `Kaynak: ${targetChannel.members.size} kişi → Hedef: ${sourceChannel.members.size} kişi`, inline: false }
+            )
+            .setColor(0x0099ff)
+            .setThumbnail(targetMember.user.displayAvatarURL({ size: 256 }))
+        ]
+      });
+
+      // Detaylı log yaz
+      await sendToChannel(_client, cfg.logChannels.memberActivity || '1531544990721773720', {
+        embeds: [
+          baseEmbed('🔵 ÜYE ÇEKILME LOGU', 0x0099ff)
+            .setDescription(`<@${message.author.id}> tarafından <@${targetMember.id}> çekildi`)
+            .addFields(
+              { name: '👤 ÇEKEN', value: `${message.author.tag}\n(\`${message.author.id}\`)`, inline: true },
+              { name: '👤 ÇEKİLEN', value: `${targetMember.user.tag}\n(\`${targetMember.id}\`)`, inline: true },
+              { name: '📍 KANAL BİLGİSİ', value: `**Kaynak:** ${targetChannel.name} (\`${targetChannel.id}\`)\n**Hedef:** ${sourceChannel.name} (\`${sourceChannel.id}\`)`, inline: false },
+              { name: '🎤 KAPASİTE', value: `**Kaynak Kanal:** ${targetChannel.members.size} → ${targetChannel.members.size - 1} kişi\n**Hedef Kanal:** ${sourceChannel.members.size - 1} → ${sourceChannel.members.size} kişi`, inline: false },
+              { name: '⏱️ İŞLEM ZAMANı', value: `\`${new Date().toLocaleString('tr-TR')}\``, inline: true },
+              { name: '✅ DURUM', value: 'BAŞARILI', inline: true }
+            )
+            .setColor(0x0099ff)
+            .setThumbnail(targetMember.user.displayAvatarURL({ size: 256 }))
+            .setFooter({ text: `━ Ses Kanal Yönetimi • Çek Komutu`, iconURL: _client.user?.displayAvatarURL() })
+        ]
+      });
+
+    } catch (e) {
+      await message.reply(`❌ Çek işlemi başarısız: ${e.message}`);
+      
+      // Hata log'u
+      await sendToChannel(_client, cfg.logChannels.memberActivity || '1531544990721773720', {
+        embeds: [
+          baseEmbed('❌ ÇEK KOMUTU HATASI', 0xff0000)
+            .setDescription(`<@${message.author.id}> tarafından <@${targetMember.id}> çekilmeye çalışıldı`)
+            .addFields(
+              { name: '❌ HATA', value: e.message, inline: false },
+              { name: '⏱️ ZAMANı', value: `\`${new Date().toLocaleString('tr-TR')}\``, inline: true }
+            )
+            .setColor(0xff0000)
+        ]
+      });
+    }
+    return;
+  }
+
+  // ===== GİT KOMUTU - Kullanıcının Yanına Git =====
+  if (cmd === 'git') {
+    // Yetki kontrolü - Herkes yapabilir (ama ses kanalında olması gerekli)
+    const target = parseUserFromMessage(message, args);
+    if (!target) {
+      await message.reply('❌ Kullanıcı etiketle veya ID yaz. Kullanım: `.git @user`');
+      return;
+    }
+
+    // Executor ses kanalında mı?
+    if (!message.member.voice.channel) {
+      await message.reply('❌ Sen ses kanalında değilsin.');
+      return;
+    }
+
+    // Target user'ı fetch et
+    const targetMember = await fetchMember(message.guild, target);
+    if (!targetMember) {
+      await message.reply('❌ Kullanıcı bulunamadı.');
+      return;
+    }
+
+    // Target ses kanalında mı?
+    if (!targetMember.voice.channel) {
+      await message.reply(`❌ <@${targetMember.id}> ses kanalında değil.`);
+      return;
+    }
+
+    // Executor'un kanalı
+    const sourceChannel = message.member.voice.channel;
+    const targetChannel = targetMember.voice.channel;
+
+    // Aynı kanalda mı?
+    if (sourceChannel.id === targetChannel.id) {
+      await message.reply('ℹ️ Zaten aynı kanaldasınız.');
+      return;
+    }
+
+    try {
+      // Executor'u git
+      await message.member.voice.setChannel(targetChannel, 'Git komutu kullanıldı');
+
+      // Başarı mesajı
+      await message.reply({
+        embeds: [
+          baseEmbed('✅ HAREKETE GEÇİLDİ', 0x00ff00)
+            .setDescription(`<@${targetMember.id}>'ın yanına gidildi!`)
+            .addFields(
+              { name: '👤 GİDEN', value: `${message.author.tag} (\`${message.author.id}\`)`, inline: true },
+              { name: '👤 GİDİLEN', value: `${targetMember.user.tag} (\`${targetMember.id}\`)`, inline: true },
+              { name: '📍 KAYNAK KANAL', value: `${sourceChannel.name} (\`${sourceChannel.id}\`)`, inline: true },
+              { name: '📍 HEDEF KANAL', value: `${targetChannel.name} (\`${targetChannel.id}\`)`, inline: true },
+              { name: '⏱️ Zaman', value: `\`${new Date().toLocaleTimeString('tr-TR')}\``, inline: true },
+              { name: '🎤 Kanal Durumu', value: `Kaynak: ${sourceChannel.members.size} → ${sourceChannel.members.size - 1} kişi\nHedef: ${targetChannel.members.size - 1} → ${targetChannel.members.size} kişi`, inline: false }
+            )
+            .setColor(0x00ff00)
+            .setThumbnail(message.author.displayAvatarURL({ size: 256 }))
+        ]
+      });
+
+      // Detaylı log yaz
+      await sendToChannel(_client, cfg.logChannels.memberActivity || '1531544990721773720', {
+        embeds: [
+          baseEmbed('🟢 ÜYE HAREKETI LOGU', 0x00ff00)
+            .setDescription(`<@${message.author.id}> tarafından <@${targetMember.id}>'ın yanına gidildi`)
+            .addFields(
+              { name: '👤 GİDEN', value: `${message.author.tag}\n(\`${message.author.id}\`)`, inline: true },
+              { name: '👤 GİDİLEN', value: `${targetMember.user.tag}\n(\`${targetMember.id}\`)`, inline: true },
+              { name: '📍 KANAL BİLGİSİ', value: `**Kaynak:** ${sourceChannel.name} (\`${sourceChannel.id}\`)\n**Hedef:** ${targetChannel.name} (\`${targetChannel.id}\`)`, inline: false },
+              { name: '🎤 KAPASİTE', value: `**Kaynak Kanal:** ${sourceChannel.members.size} → ${sourceChannel.members.size - 1} kişi\n**Hedef Kanal:** ${targetChannel.members.size - 1} → ${targetChannel.members.size} kişi`, inline: false },
+              { name: '⏱️ İŞLEM ZAMANı', value: `\`${new Date().toLocaleString('tr-TR')}\``, inline: true },
+              { name: '✅ DURUM', value: 'BAŞARILI', inline: true }
+            )
+            .setColor(0x00ff00)
+            .setThumbnail(message.author.displayAvatarURL({ size: 256 }))
+            .setFooter({ text: `━ Ses Kanal Yönetimi • Git Komutu`, iconURL: _client.user?.displayAvatarURL() })
+        ]
+      });
+
+    } catch (e) {
+      await message.reply(`❌ Hareket işlemi başarısız: ${e.message}`);
+      
+      // Hata log'u
+      await sendToChannel(_client, cfg.logChannels.memberActivity || '1531544990721773720', {
+        embeds: [
+          baseEmbed('❌ GİT KOMUTU HATASI', 0xff0000)
+            .setDescription(`<@${message.author.id}> tarafından <@${targetMember.id}>'ın yanına gidilmeye çalışıldı`)
+            .addFields(
+              { name: '❌ HATA', value: e.message, inline: false },
+              { name: '⏱️ ZAMANı', value: `\`${new Date().toLocaleString('tr-TR')}\``, inline: true }
+            )
+            .setColor(0xff0000)
+        ]
+      });
+    }
+    return;
+  }
+
   // ===== RESTORE KOMUTU (DEAKTIF) =====
   // if (cmd === 'restore' || cmd === 'geri' || cmd === 'yükle') {
   //   // TODO: Enable when needed
