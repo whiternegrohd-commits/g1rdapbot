@@ -867,7 +867,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // ⏱️ TIMEOUT DM GÖNDER
     await member.user.send({
-      content: `⏱️ discord.gg/girdap sunucusunda timeout cezası aldın\n${reason !== 'Sebep yok' ? `📝 **Sebep:** ${reason}` : ''}\n⏰ **Süre:** ${mins} dakika\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+      content: `⏱️ Girdap sunucusunda timeout cezası aldın\n${reason !== 'Sebep yok' ? `📝 **Sebep:** ${reason}` : ''}\n⏰ **Süre:** ${mins} dakika\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
     }).catch(() => {});
 
     await interaction.reply({
@@ -958,7 +958,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // 🚫 BAN DM GÖNDER
     await member.user.send({
-      content: `🚫 discord.gg/girdap sunucusundan banlandın\n${reason !== 'Sebep yok' ? `📝 **Sebep:** ${reason}` : ''}\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+      content: `🚫 Girdap sunucusundan banlandın\n${reason !== 'Sebep yok' ? `📝 **Sebep:** ${reason}` : ''}\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
     }).catch(() => {});
 
     await interaction.reply({
@@ -1051,7 +1051,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // 👢 KICK DM GÖNDER
     await member.user.send({
-      content: `👢 discord.gg/girdap sunucusundan kicklendin\n${reason !== 'Sebep yok' ? `📝 **Sebep:** ${reason}` : ''}\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+      content: `👢 Girdap sunucusundan kicklendin\n${reason !== 'Sebep yok' ? `📝 **Sebep:** ${reason}` : ''}\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
     }).catch(() => {});
 
     await interaction.reply({
