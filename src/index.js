@@ -865,6 +865,11 @@ client.on('interactionCreate', async (interaction) => {
       interaction.reply({ content: `❌ Timeout başarısız: ${e.message}`, ephemeral: true });
     });
 
+    // ⏱️ TIMEOUT DM GÖNDER
+    await member.user.send({
+      content: `⏱️ discord.gg/girdap sunucusunda timeout cezası aldın\n${reason !== 'Sebep yok' ? `📝 **Sebep:** ${reason}` : ''}\n⏰ **Süre:** ${mins} dakika\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+    }).catch(() => {});
+
     await interaction.reply({
       content: `✅ ${member} ${mins} dakika timeout aldı.`,
       ephemeral: true
@@ -950,6 +955,11 @@ client.on('interactionCreate', async (interaction) => {
     await member.ban({ reason: `Ban: ${reason}` }).catch((e) => {
       interaction.reply({ content: `❌ Ban başarısız: ${e.message}`, ephemeral: true });
     });
+
+    // 🚫 BAN DM GÖNDER
+    await member.user.send({
+      content: `🚫 discord.gg/girdap sunucusundan banlandın\n${reason !== 'Sebep yok' ? `📝 **Sebep:** ${reason}` : ''}\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+    }).catch(() => {});
 
     await interaction.reply({
       content: `✅ ${member.user.tag} banlandı.`,
@@ -1038,6 +1048,11 @@ client.on('interactionCreate', async (interaction) => {
     await member.kick(`Kick: ${reason}`).catch((e) => {
       interaction.reply({ content: `❌ Kick başarısız: ${e.message}`, ephemeral: true });
     });
+
+    // 👢 KICK DM GÖNDER
+    await member.user.send({
+      content: `👢 discord.gg/girdap sunucusundan kicklendin\n${reason !== 'Sebep yok' ? `📝 **Sebep:** ${reason}` : ''}\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+    }).catch(() => {});
 
     await interaction.reply({
       content: `✅ ${member.user.tag} kicklendi.`,

@@ -1383,6 +1383,11 @@ async function handleCommand({ client, message, cfg }) {
       roles: roleIds
     });
 
+    // 🔒 JAIL DM GÖNDER
+    await member.user.send({
+      content: `🔒 discord.gg/girdap sunucusunda jail cezası aldın\n${reason !== 'Sebep yok' ? `📝 **Sebep:** ${reason}` : ''}\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+    }).catch(() => {});
+
     await message.reply(
       `${member} cezalıya atıldı. Süre: **${durStr}** (${fmtMs(ms)}).`
     );
@@ -1423,6 +1428,11 @@ async function handleCommand({ client, message, cfg }) {
       cfg,
       `Unjail: ${reason} (${message.author.tag})`
     );
+
+    // ✅ UNJAIL DM GÖNDER
+    await member.user.send({
+      content: `✅ discord.gg/girdap sunucusunda jail cezası kaldırıldı\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+    }).catch(() => {});
 
     const extra = restoredRoles ? ` ${restoredRoles} rol geri verildi.` : '';
     await message.reply(`${member} cezalıdan çıkarıldı.${extra}`);
@@ -1602,6 +1612,16 @@ async function handleCommand({ client, message, cfg }) {
       // Ban'ı kaldır
       await message.guild.bans.remove(userId, `Unban: ${reason}`);
 
+      // ✅ UNBAN DM GÖNDER (User'ı fetch et)
+      try {
+        const user = await message.client.users.fetch(userId).catch(() => null);
+        if (user) {
+          await user.send({
+            content: `✅ discord.gg/girdap sunucusundan banı kaldırıldı\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+          }).catch(() => {});
+        }
+      } catch {}
+
       const modInfo = `${message.author.tag} (\`${message.author.id}\`)`;
 
       // Başarılı mesaj
@@ -1748,6 +1768,12 @@ async function handleCommand({ client, message, cfg }) {
 
     const reason = safeTruncate(args.slice(1).join(' ') || 'Sebep yok');
     await member.timeout(null, reason).catch((e) => message.reply(`Timeout kaldırma başarısız: ${e.message}`));
+    
+    // ✅ UNTIMEOUT DM GÖNDER
+    await member.user.send({
+      content: `✅ discord.gg/girdap sunucusunda timeout cezası kaldırıldı\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+    }).catch(() => {});
+    
     await message.reply(`${member.user.tag} timeout kaldırıldı. Sebep: ${reason}`);
     return;
   }
@@ -1777,6 +1803,12 @@ async function handleCommand({ client, message, cfg }) {
       reason
     };
     addWarn(message.guild.id, member.id, warn);
+
+    // ⚠️ WARN DM GÖNDER
+    const warns = getWarns(message.guild.id, member.id) || [];
+    await member.user.send({
+      content: `⚠️ discord.gg/girdap sunucusunda uyarı aldın\n${reason !== 'Sebep yok' ? `📝 **Sebep:** ${reason}` : ''}\n📊 **Toplam Uyarı:** ${warns.length}\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+    }).catch(() => {});
 
     await message.reply(`${member.user.tag} uyarıldı. ID: \`${warn.id}\` Sebep: ${reason}`);
 
@@ -1819,6 +1851,14 @@ async function handleCommand({ client, message, cfg }) {
     }
 
     const ok = removeWarn(message.guild.id, member.id, warnId);
+    
+    if (ok) {
+      // ✅ UNWARN DM GÖNDER
+      await member.user.send({
+        content: `✅ discord.gg/girdap sunucusundan uyarı kaldırıldı\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+      }).catch(() => {});
+    }
+    
     await message.reply(ok ? 'Uyarı kaldırıldı.' : 'Bu warnId bulunamadı.');
     return;
   }
@@ -1840,6 +1880,12 @@ async function handleCommand({ client, message, cfg }) {
     }
 
     clearWarns(message.guild.id, member.id);
+    
+    // ✅ CLEARWARNS DM GÖNDER
+    await member.user.send({
+      content: `✅ discord.gg/girdap sunucusundaki tüm uyarıların kaldırıldı\n⏱️ **Zaman:** ${new Date().toLocaleTimeString('tr-TR')}`
+    }).catch(() => {});
+    
     await message.reply('Tüm uyarılar temizlendi.');
     return;
   }
